@@ -8,14 +8,14 @@
     return document.getElementById(id);
   }
 
-  function qsa(sel, root = document) {
-    return root.querySelectorAll(sel);
+  function qsa(selector, root = document) {
+    return root.querySelectorAll(selector);
   }
 
   function getSession() {
     try {
       return JSON.parse(sessionStorage.getItem('jrn_session'));
-    } catch (e) {
+    } catch (err) {
       return null;
     }
   }
@@ -72,8 +72,8 @@
         return;
       }
 
-      const err = await res.text();
-      throw new Error(`Supabase error ${res.status}: ${err}`);
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Supabase error ${res.status}: ${errText}`);
     }
 
     if (res.status === 204) return null;
@@ -83,10 +83,10 @@
   async function uploadImage(file, folder = 'profile') {
     const token = getAuthToken();
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const filePath = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
     const res = await fetch(
-      `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`,
+      `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${filePath}`,
       {
         method: 'POST',
         headers: {
@@ -99,15 +99,15 @@
     );
 
     if (!res.ok) {
-      const err = await res.text().catch(() => '');
-      throw new Error(`Image upload failed${err ? `: ${err}` : ''}`);
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Image upload failed${errText ? `: ${errText}` : ''}`);
     }
 
-    return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
+    return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${filePath}`;
   }
 
-  function generateSlug(name) {
-    return String(name || '')
+  function generateSlug(value) {
+    return String(value || '')
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .trim()
@@ -115,44 +115,43 @@
       .replace(/-+/g, '-');
   }
 
-  function showToast(msg, type = 'success') {
+  function showToast(message, type = 'success') {
     const wrap = gid('toast-wrap');
+
     if (!wrap) {
-      console.log(`[${type}] ${msg}`);
+      console.log(`[${type}] ${message}`);
       return;
     }
 
-    const t = document.createElement('div');
-    t.className = `toast ${type}`;
-    t.textContent = msg;
-    wrap.appendChild(t);
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    wrap.appendChild(toast);
 
-    setTimeout(() => t.remove(), 3500);
-  }
-
-  function closeModal(modalId) {
-    const modal = typeof modalId === 'string' ? gid(modalId) : modalId;
-    if (!modal) return;
-
-    modal.classList.remove('open');
-    document.body.style.overflow = '';
+    setTimeout(() => toast.remove(), 3500);
   }
 
   function openModal(modalId) {
     const modal = typeof modalId === 'string' ? gid(modalId) : modalId;
     if (!modal) return;
-
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
   }
 
-  function updateBadges(locCount, evtCount) {
-    const apply = () => {
-      const locBadge = gid('nav_badge');
-      const evtBadge = gid('nav_badge_events');
+  function closeModal(modalId) {
+    const modal = typeof modalId === 'string' ? gid(modalId) : modalId;
+    if (!modal) return;
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
 
-      if (locBadge) locBadge.textContent = String(locCount ?? 0);
-      if (evtBadge) evtBadge.textContent = String(evtCount ?? 0);
+  function updateBadges(locationCount, eventCount) {
+    const apply = () => {
+      const locationBadge = gid('nav_badge');
+      const eventBadge = gid('nav_badge_events');
+
+      if (locationBadge) locationBadge.textContent = String(locationCount ?? 0);
+      if (eventBadge) eventBadge.textContent = String(eventCount ?? 0);
     };
 
     apply();
@@ -161,24 +160,30 @@
 
   let lastActionTime = null;
 
-  function updateLastUpdated(iso) {
-    if (iso) lastActionTime = iso;
+  function updateLastUpdated(isoString) {
+    if (isoString) lastActionTime = isoString;
 
-    const d = iso ? new Date(iso) : new Date();
-    const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const ts = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    const today = d.toDateString() === new Date().toDateString();
+    const date = isoString ? new Date(isoString) : new Date();
+    const dateText = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+    const timeText = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    const isToday = date.toDateString() === new Date().toDateString();
 
     document.querySelectorAll('[class*="card_component"]').forEach((card) => {
-      const lbl = card.querySelector('[class*="card_label"]');
-      if (!lbl) return;
-      if (!lbl.textContent.trim().toUpperCase().includes('LAST UPDATED')) return;
+      const label = card.querySelector('[class*="card_label"]');
+      if (!label) return;
+      if (!label.textContent.trim().toUpperCase().includes('LAST UPDATED')) return;
 
       const value = card.querySelector('[class*="card_value"]');
       const sub = card.querySelector('[class*="card_sub"]');
 
-      if (value) value.textContent = today ? 'Today' : ds;
-      if (sub) sub.textContent = today ? ts : `${ds}, ${ts}`;
+      if (value) value.textContent = isToday ? 'Today' : dateText;
+      if (sub) sub.textContent = isToday ? timeText : `${dateText}, ${timeText}`;
     });
   }
 
@@ -187,10 +192,6 @@
   }
 
   window.JournezAdminCore = {
-    SUPABASE_URL,
-    SUPABASE_ANON,
-    STORAGE_BUCKET,
-    LOGIN_URL,
     gid,
     qsa,
     getSession,
