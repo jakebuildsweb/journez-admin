@@ -1,5 +1,3 @@
-console.log('locations.js loaded');
-
 const SVG_CHECK='<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M5 13l4 4L19 7"/></svg>';
 const gid=id=>document.getElementById(id);
 const qsa=sel=>document.querySelectorAll(sel);
@@ -825,5 +823,3 @@ window.toggleDay = toggleDay;
 window.set24 = set24;
 window.onTimeChange = onTimeChange;
 window.loadAndRenderTable = loadAndRenderTable;
-
-console.log('locations.js finished');
