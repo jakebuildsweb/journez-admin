@@ -68,10 +68,6 @@ function showToast(msg, type = 'success') {
 }
 let CITIES_DATA = [];
 let CATEGORIES_DATA = [];
-function updateSidebar(count) {
-  const b=document.getElementById('nav_badge');if(b)b.textContent=count;
-  sbFetch('events?select=id').then(r=>{const e=document.getElementById('nav_badge_events');if(e)e.textContent=(r||[]).length;}).catch(()=>{});
-}
 let _lastActionTime=null;
 function updateLastUpdated(iso){if(iso)_lastActionTime=iso;const d=iso?new Date(iso):new Date();
 const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});const ts=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});const today=d.toDateString()===new Date().toDateString();document.querySelectorAll('[class*="card_component"]').forEach(card=>{const lbl=card.querySelector('[class*="card_label"]');if(lbl&&lbl.textContent.trim().toUpperCase().includes('LAST UPDATED')){const v=card.querySelector('[class*="card_value"]');const s=card.querySelector('[class*="card_sub"]');if(v)v.textContent=today?'Today':ds;if(s)s.textContent=today?ts:`${ds}, ${ts}`;}});}
@@ -202,17 +198,44 @@ function getCatName(catId) {
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
-  tbody.innerHTML='<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>';
+
+  tbody.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>';
+
   try {
-    const locations = await sbFetch(
-      'locations?select=id,name,address,latitude,longitude,city_id,category_id,profile_image,audio_file_link,is_focal_point,operating_hours,slug,updated_at&order=name'
-    );
+    const [locations, eventData] = await Promise.all([
+      sbFetch('locations?select=id,name,address,latitude,longitude,city_id,category_id,profile_image,audio_file_link,is_focal_point,operating_hours,slug,updated_at&order=name'),
+      sbFetch('events?select=id'),
+    ]);
+
     const locs = locations || [];
+    const locCount = locs.length;
+    const evtCount = (eventData || []).length;
+    const cityCount = [...new Set(locs.map(l => l.city_id).filter(Boolean))].length;
+
     renderTable(locs);
-    const cityCount=[...new Set(locs.map(l=>l.city_id).filter(Boolean))].length;const _st=gid('stat-total');if(_st){_st.textContent=locs.length;const _ss=_st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');if(_ss)_ss.textContent=`Across ${cityCount} cit${cityCount===1?'y':'ies'}`;}const _sc=gid('stat-cities');if(_sc){_sc.textContent=cityCount;const _scs=_sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');if(_scs)_scs.textContent='Active in app';}
-    updateSidebar(locs.length);
-    const effective=[locs.map(l=>l.updated_at).filter(Boolean).sort().reverse()[0],_lastActionTime].filter(Boolean).sort().reverse()[0];
-    if(effective)updateLastUpdated(effective);
+
+    const _st = gid('stat-total');
+    if (_st) {
+      _st.textContent = locCount;
+      const _ss = _st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
+      if (_ss) _ss.textContent = `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`;
+    }
+
+    const _sc = gid('stat-cities');
+    if (_sc) {
+      _sc.textContent = cityCount;
+      const _scs = _sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
+      if (_scs) _scs.textContent = 'Active in app';
+    }
+
+    updateBadges(locCount, evtCount);
+
+    const effective = [
+      locs.map(l => l.updated_at).filter(Boolean).sort().reverse()[0],
+      _lastActionTime
+    ].filter(Boolean).sort().reverse()[0];
+
+    if (effective) updateLastUpdated(effective);
   } catch (e) {
     tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg><div class="empty-title">Failed to load</div><div class="empty-sub">${e.message}</div></div>`;
   }
