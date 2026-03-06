@@ -89,57 +89,77 @@ function isUpcoming(startDate) {
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
- tbody.innerHTML = '';
-tbody.insertAdjacentHTML(
-  'beforeend',
-  '<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>'
-);
+
+  tbody.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>`;
+
   try {
-    const [events, locData] = await Promise.all([
-      sbFetch('events?select=id,name,address,city_id,profile_image,speechify_link,start_date,end_date,start_time,end_time,slug,updated_at&order=start_date'),
-      sbFetch('locations?select=id'),
-    ]);
+    const events = await sbFetch(
+      'events?select=id,name,address,city_id,start_date,end_date,start_time,end_time,website,profile_image,audio_file_link,latitude,longitude,updated_at&order=start_date.desc.nullslast,name'
+    );
+
     const evts = events || [];
-    const locCount = (locData||[]).length;
-    const evtCount = evts.length;
-    const upcomingCount = evts.filter(e=>{
-    if(!e.start_date)return false;
-    const now=new Date(),d=new Date(e.start_date);
-    return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
-  }).length;
     renderTable(evts);
-    const _st=gid('stat-total');if(_st){_st.textContent=evtCount;const _ss=_st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');if(_ss)_ss.textContent='Total Events';}
-    const _sc=gid('stat-cities');if(_sc){_sc.textContent=upcomingCount;const _scs=_sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');if(_scs)_scs.textContent='Upcoming this month';}
-    updateBadges(locCount, evtCount);
-    const effective=[evts.map(e=>e.updated_at).filter(Boolean).sort().reverse()[0],_lastActionTime].filter(Boolean).sort().reverse()[0];
-    if(effective)updateLastUpdated(effective);
+
+    const cityCount = [...new Set(evts.map(e => e.city_id).filter(Boolean))].length;
+
+    const _st = gid('stat-total');
+    if (_st) {
+      _st.textContent = evts.length;
+      const _ss = _st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
+      if (_ss) _ss.textContent = `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`;
+    }
+
+    const _sc = gid('stat-cities');
+    if (_sc) {
+      _sc.textContent = cityCount;
+      const _scs = _sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
+      if (_scs) _scs.textContent = 'Active in app';
+    }
+
+    updateBadges(null, evts.length);
   } catch (e) {
-    tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg><div class="empty-title">Failed to load</div><div class="empty-sub">${e.message}</div></div>`;
+    tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg><div class="empty-title">Failed to load</div><div class="empty-sub">${e.message}</div></div>`;
   }
 }
 function renderTable(events) {
-  const tbody    = gid('table-body');
+  const tbody = gid('table-body');
   const filtered = applySortFilter(events);
-  const _tot=_AL?.length||events.length;
+
   if (filtered.length === 0) {
-    tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><div class="empty-title">No results</div><div class="empty-sub"></div></div>`;
+    tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z"/></svg><div class="empty-title">No events found</div><div class="empty-sub">Try adjusting filters.</div></div>`;
     return;
   }
+
   tbody.innerHTML = filtered.map(e => {
-    const cityName=getCityName(e.city_id);
-    const dateStr=formatDateRange(e.start_date,e.end_date);
-    const upcoming=isUpcoming(e.start_date);
-    const dateBadge=upcoming
-      ?`<span class="city-tag" style="background:#f0fdf4;color:#16a34a;border-color:transparent">${dateStr}</span>`
-      :`<span class="city-tag" style="background:var(--gray-100);color:var(--gray-400);border-color:transparent">${dateStr}</span>`;
-    const audioIcon=e.speechify_link
-      ? `<span title="Audio" class="audio-icon">
-           <svg width="8" height="8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zm-1 16.93V22h2v-2.07A7 7 0 0019 13h-2a5 5 0 01-10 0H5a7 7 0 006 6.93z"/></svg>
+    const cityName = getCityName(e.city_id);
+
+    const dateText = e.start_date
+      ? new Date(`${e.start_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '—';
+
+    const endDateText = e.end_date
+      ? new Date(`${e.end_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : null;
+
+    const dateRange = endDateText && endDateText !== dateText
+      ? `${dateText} – ${endDateText}`
+      : dateText;
+
+    const timeRange = e.start_time && e.end_time
+      ? `${formatTime(e.start_time)} – ${formatTime(e.end_time)}`
+      : e.start_time
+      ? formatTime(e.start_time)
+      : '—';
+
+    const audioIcon = e.audio_file_link
+      ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#fdf4ff;color:#9333ea;flex-shrink:0">
+           <svg width="8" height="8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zm-1 18.93V22h2v-2.07A8.001 8.001 0 0020 12h-2a6 6 0 01-12 0H4a8.001 8.001 0 007 7.93z"/></svg>
          </span>` : '';
-    return `<div class="table-row" onclick="openEditModal('${e.id}')"><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${e.name}</div>${audioIcon}
-        </div><div class="loc-addr">${e.address || '—'}</div></div><div>${dateBadge}</div><div><span class="city-tag">${cityName}</span></div><div class="row-actions"><button class="icon-btn" onclick="event.stopPropagation();openEditModal('${e.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteEvent('${e.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
+
+    return `<div class="table-row" onclick="openEditModal('${e.id}')"><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${e.name}</div>${audioIcon}</div><div class="loc-addr">${e.address || '—'}</div></div><div><span class="city-tag">${cityName}</span></div><div><div style="font-size:12.5px;color:var(--gray-800);font-weight:500">${dateRange}</div><div style="font-size:12px;color:var(--gray-400);margin-top:2px">${timeRange}</div></div><div><a href="${e.website || '#'}" target="_blank" ${e.website ? '' : 'onclick="event.preventDefault()"'} style="font-size:12px;color:${e.website ? 'var(--accent)' : 'var(--gray-300)'};text-decoration:none">${e.website ? 'Visit site' : '—'}</a></div><div class="row-actions"><button class="icon-btn" onclick="event.stopPropagation();openEditModal('${e.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteEvent('${e.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
   }).join('');
-  _AL=events;
+
+  window._allEvents = events;
 }
 let _AL=null;let _sortKey='start_date',_sortDir='asc';
 function onSortChange(v){[_sortKey,_sortDir]=v.split('-');filterTable();}
