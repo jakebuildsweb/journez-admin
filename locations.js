@@ -1,3 +1,5 @@
+console.log('locations.js loaded');
+
 <script>
 const SVG_CHECK='<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M5 13l4 4L19 7"/></svg>';
 const gid=id=>document.getElementById(id);
@@ -802,3 +804,5 @@ if (sectionHeader) {
   loadAndRenderTable();
 });
 </script>
+
+console.log('locations.js finished');
