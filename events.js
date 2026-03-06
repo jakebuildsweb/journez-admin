@@ -124,6 +124,37 @@ function formatDate(dateStr) {
   });
 }
 
+function updateEventsStatCards(evts) {
+  const evtCount = evts.length;
+  const cityCount = [...new Set(evts.map(e => e.city_id).filter(Boolean))].length;
+
+  const now = new Date();
+  const currentMonthCount = evts.filter(e => {
+    if (!e.start_date) return false;
+    const d = new Date(`${e.start_date}T00:00:00`);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
+
+  const cards = [...document.querySelectorAll('[class*="card_component"]')];
+
+  function setCard(card, value, subtext) {
+    if (!card) return;
+    const valueEl = card.querySelector('[class*="card_value"]');
+    const subEl = card.querySelector('[class*="card_sub"]');
+    if (valueEl) valueEl.textContent = String(value);
+    if (subEl) subEl.textContent = subtext;
+  }
+
+  const totalCard =
+    gid('stat-total')?.closest('[class*="card_component"]') || cards[0];
+
+  const monthCard =
+    gid('stat-cities')?.closest('[class*="card_component"]') || cards[1];
+
+  setCard(totalCard, evtCount, `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`);
+  setCard(monthCard, currentMonthCount, 'This current month');
+}
+
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
@@ -138,17 +169,10 @@ async function loadAndRenderTable() {
 
     const evts = events || [];
     const locCount = (locData || []).length;
-    const evtCount = evts.length;
-    const cityCount = [...new Set(evts.map(e => e.city_id).filter(Boolean))].length;
+   const evtCount = evts.length;
 
-    renderTable(evts);
-
-    const _st = gid('stat-total');
-    if (_st) {
-      _st.textContent = evtCount;
-      const _ss = _st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
-      if (_ss) _ss.textContent = `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`;
-    }
+renderTable(evts);
+updateEventsStatCards(evts);
 
     const _sc = gid('stat-cities');
     if (_sc) {
