@@ -90,21 +90,24 @@ async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
 
-  tbody.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>`;
+  tbody.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>';
 
   try {
-    const events = await sbFetch(
-      'events?select=id,name,address,city_id,start_date,end_date,start_time,end_time,website,profile_image,audio_file_link,latitude,longitude,updated_at&order=start_date.desc.nullslast,name'
-    );
+    const [events, locData] = await Promise.all([
+      sbFetch('events?select=id,name,address,city_id,profile_image,speechify_link,start_date,end_date,start_time,end_time,slug,updated_at&order=start_date'),
+      sbFetch('locations?select=id'),
+    ]);
 
     const evts = events || [];
-    renderTable(evts);
-
+    const locCount = (locData || []).length;
+    const evtCount = evts.length;
     const cityCount = [...new Set(evts.map(e => e.city_id).filter(Boolean))].length;
+
+    renderTable(evts);
 
     const _st = gid('stat-total');
     if (_st) {
-      _st.textContent = evts.length;
+      _st.textContent = evtCount;
       const _ss = _st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
       if (_ss) _ss.textContent = `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`;
     }
@@ -116,7 +119,14 @@ async function loadAndRenderTable() {
       if (_scs) _scs.textContent = 'Active in app';
     }
 
-    updateBadges(null, evts.length);
+    updateBadges(locCount, evtCount);
+
+    const effective = [
+      evts.map(e => e.updated_at).filter(Boolean).sort().reverse()[0],
+      _lastActionTime
+    ].filter(Boolean).sort().reverse()[0];
+
+    if (effective) updateLastUpdated(effective);
   } catch (e) {
     tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg><div class="empty-title">Failed to load</div><div class="empty-sub">${e.message}</div></div>`;
   }
