@@ -803,4 +803,27 @@ if (sectionHeader) {
   loadAndRenderTable();
 });
 
+window.saveLocation = saveLocation;
+window.closeModal = closeModal;
+window.openAddModal = openAddModal;
+window.openImportModal = openImportModal;
+window.toggleNewCity = toggleNewCity;
+window.switchImgTab = switchImgTab;
+window.handleProfileFile = handleProfileFile;
+window.handleGalleryFiles = handleGalleryFiles;
+window.handleImportFile = handleImportFile;
+window.confirmImport = confirmImport;
+window.resetImportModal = resetImportModal;
+window.downloadTemplate = downloadTemplate;
+window.copyMonToAll = copyMonToAll;
+window.setPattern = setPattern;
+window.onSortChange = onSortChange;
+window.openEditModal = openEditModal;
+window.deleteLocation = deleteLocation;
+window.removeGalleryItem = removeGalleryItem;
+window.toggleDay = toggleDay;
+window.set24 = set24;
+window.onTimeChange = onTimeChange;
+window.loadAndRenderTable = loadAndRenderTable;
+
 console.log('locations.js finished');
