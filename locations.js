@@ -986,30 +986,36 @@ async function saveLocation() {
 document.addEventListener('DOMContentLoaded', async function () {
   const _logoEl=document.querySelector('[class*="sidebar_logo-icon"]');if(_logoEl){_logoEl.style.background='none';_logoEl.innerHTML='<img src="https://cdn.prod.website-files.com/63e53396a34018da90230c8e/66b1545192b2665e1e65817d_Journez%20Logo.svg" style="width:32px;height:32px">';}
   
-  const sectionHeader = gid('section-header');
-    const _sh_title = document.createElement('div');
-    _sh_title.className = 'section-title';
-    _sh_title.textContent = 'All Locations';
-    sectionHeader.appendChild(_sh_title);
-    const controls = document.createElement('div');
-    controls.className = 'section-right';
-    controls.innerHTML = `
-      <div class="search-bar">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        <input type="text" id="search-input" placeholder="Search locations…">
-      </div>
-      <div class="city-filter">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-        <select id="city-select"><option value="">All Cities</option></select>
-      </div>
-      <div class="city-filter">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 6h18M7 12h10M11 18h2"/></svg><select id="sort-select" onchange="onSortChange(this.value)"><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="city-asc">City A–Z</option><option value="city-desc">City Z–A</option><option value="category-asc">Category A–Z</option><option value="category-desc">Category Z–A</option><option value="updated-desc">Updated ↓</option><option value="updated-asc">Updated ↑</option>
-        </select>
-      </div>`;
-    sectionHeader.appendChild(controls);
-    gid('search-input').addEventListener('input', filterTable);
-    gid('city-select').addEventListener('change', filterTable);
-  }
+ const sectionHeader = gid('section-header');
+if (sectionHeader) {
+  const controls = document.createElement('div');
+  controls.className = 'section-right';
+  controls.innerHTML = `
+    <div class="search-bar">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="search-input">
+    </div>
+    <div class="city-filter">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+      <select id="city-select"><option value="">All Cities</option></select>
+    </div>
+    <div class="city-filter">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+      <select id="sort-select" onchange="onSortChange(this.value)">
+        <option value="name-asc">Name A–Z</option>
+        <option value="name-desc">Name Z–A</option>
+        <option value="city-asc">City A–Z</option>
+        <option value="city-desc">City Z–A</option>
+        <option value="category-asc">Category A–Z</option>
+        <option value="category-desc">Category Z–A</option>
+        <option value="updated-desc">Updated ↓</option>
+        <option value="updated-asc">Updated ↑</option>
+      </select>
+    </div>`;
+  sectionHeader.appendChild(controls);
+  gid('search-input').addEventListener('input', filterTable);
+  gid('city-select').addEventListener('change', filterTable);
+}
   const pageHeader = document.querySelector('[class*="topbar_right"]');
   if (pageHeader && !gid('btn-signout')) {
     const signoutBtn = document.createElement('button');
