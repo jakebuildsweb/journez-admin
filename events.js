@@ -89,7 +89,16 @@ function isUpcoming(startDate) {
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
-  tbody.innerHTML='<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>';
+ tbody.innerHTML = `
+<tr>
+  <td colspan="5">
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading...</div>
+    </div>
+  </td>
+</tr>
+`;
   try {
     const [events, locData] = await Promise.all([
       sbFetch('events?select=id,name,address,city_id,profile_image,speechify_link,start_date,end_date,start_time,end_time,slug,updated_at&order=start_date'),
