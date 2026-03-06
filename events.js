@@ -67,8 +67,12 @@ function showToast(msg, type = 'success') {
 }
 let CITIES_DATA = [];
 function updateBadges(locCount, evtCount) {
-  const b=document.getElementById('nav_badge');if(b)b.textContent=locCount;
-  const e=document.getElementById('nav_badge_events');if(e)e.textContent=evtCount;
+  const apply=()=>{
+    const b=document.getElementById('nav_badge');if(b)b.textContent=locCount;
+    const e=document.getElementById('nav_badge_events');if(e)e.textContent=evtCount;
+  };
+  apply();
+  setTimeout(apply,500);
 }
 let _lastActionTime=null;
 function updateLastUpdated(iso){if(iso)_lastActionTime=iso;const d=iso?new Date(iso):new Date();
