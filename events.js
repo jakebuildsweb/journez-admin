@@ -712,13 +712,18 @@ async function saveEvent() {
   });
 });
 document.addEventListener('DOMContentLoaded', async function () {
-  const _logoEl=document.querySelector('[class*="sidebar_logo-icon"]');if(_logoEl){_logoEl.style.background='none';_logoEl.innerHTML='<img src="https://cdn.prod.website-files.com/63e53396a34018da90230c8e/66b1545192b2665e1e65817d_Journez%20Logo.svg" style="width:32px;height:32px">';}
-  buildNav(); = gid('section-header');
+  const _logoEl = document.querySelector('[class*="sidebar_logo-icon"]');
+  if (_logoEl) {
+    _logoEl.style.background = 'none';
+    _logoEl.innerHTML = '<img src="https://cdn.prod.website-files.com/63e53396a34018da90230c8e/66b1545192b2665e1e65817d_Journez%20Logo.svg" style="width:32px;height:32px">';
+  }
+
+  if (typeof buildNav === 'function') {
+    buildNav();
+  }
+
+  const sectionHeader = gid('section-header');
   if (sectionHeader && !gid('search-input')) {
-    const _sh_title = document.createElement('div');
-    _sh_title.className = 'section-title';
-    _sh_title.textContent = 'All Events';
-    sectionHeader.appendChild(_sh_title);
     const controls = document.createElement('div');
     controls.className = 'section-right';
     controls.innerHTML = `
@@ -731,27 +736,61 @@ document.addEventListener('DOMContentLoaded', async function () {
         <select id="city-select"><option value="">All Cities</option></select>
       </div>
       <div class="city-filter">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 6h18M7 12h10M11 18h2"/></svg><select id="sort-select" onchange="onSortChange(this.value)"><option value="date-asc">Date ↑</option><option value="date-desc">Date ↓</option><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="city-asc">City A–Z</option><option value="city-desc">City Z–A</option><option value="updated-desc">Updated ↓</option><option value="updated-asc">Updated ↑</option>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+        <select id="sort-select" onchange="onSortChange(this.value)">
+          <option value="date-asc">Date ↑</option>
+          <option value="date-desc">Date ↓</option>
+          <option value="name-asc">Name A–Z</option>
+          <option value="name-desc">Name Z–A</option>
+          <option value="city-asc">City A–Z</option>
+          <option value="city-desc">City Z–A</option>
+          <option value="updated-desc">Updated ↓</option>
+          <option value="updated-asc">Updated ↑</option>
         </select>
       </div>`;
     sectionHeader.appendChild(controls);
-    const _st=document.querySelector('[class*="section_title"]');
+
+    const _st = document.querySelector('[class*="section_title"]');
+    if (_st && !gid('loc-counter')) {
+      const _b = document.createElement('span');
+      _b.id = 'loc-counter';
+      _b.className = 'loc-counter-badge';
+      _st.insertAdjacentElement('afterend', _b);
+    }
+
     gid('search-input').addEventListener('input', filterTable);
     gid('city-select').addEventListener('change', filterTable);
   }
+
   const pageHeader = document.querySelector('[class*="topbar_right"]');
   if (pageHeader && !gid('btn-signout')) {
     const signoutBtn = document.createElement('button');
-    Object.assign(signoutBtn,{id:'btn-signout',className:'btn btn-secondary',textContent:'Sign out',onclick:signOut});pageHeader.appendChild(signoutBtn);
+    Object.assign(signoutBtn, {
+      id: 'btn-signout',
+      className: 'btn btn-secondary',
+      textContent: 'Sign out',
+      onclick: signOut
+    });
+    pageHeader.appendChild(signoutBtn);
   }
+
   const tableWrap = gid('table-wrap');
   if (tableWrap && !gid('table-body')) {
     const tbody = document.createElement('div');
     tbody.id = 'table-body';
     tableWrap.appendChild(tbody);
   }
-  gid('btn-add-top')?.addEventListener('click', e => { e.preventDefault(); openAddModal(); });
-  gid('btn-import')?.addEventListener('click',  e => { e.preventDefault(); openImportModal(); });
+
+  gid('btn-add-top')?.addEventListener('click', e => {
+    e.preventDefault();
+    openAddModal();
+  });
+
+  gid('btn-import')?.addEventListener('click', e => {
+    e.preventDefault();
+    openImportModal();
+  });
+
   await loadReferenceData();
   loadAndRenderTable();
 });
