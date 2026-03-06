@@ -72,9 +72,7 @@ function updateBadges(locCount, evtCount) {
 }
 let _lastActionTime=null;
 function updateLastUpdated(iso){if(iso)_lastActionTime=iso;const d=iso?new Date(iso):new Date();
-const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});const ts=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});const today=d.toDateString()===new Date().toDateString();
-const v=gid('stat_last_updated');const s=gid('stat_last_updated_sub');
-if(v)v.textContent=today?'Today':ds;if(s)s.textContent=today?ts:`${ds}, ${ts}`;}
+const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});const ts=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});const today=d.toDateString()===new Date().toDateString();document.querySelectorAll('[class*="card_component"]').forEach(card=>{const lbl=card.querySelector('[class*="card_label"]');if(lbl&&lbl.textContent.trim().toUpperCase().includes('LAST UPDATED')){const v=card.querySelector('[class*="card_value"]');const s=card.querySelector('[class*="card_sub"]');if(v)v.textContent=today?'Today':ds;if(s)s.textContent=today?ts:`${ds}, ${ts}`;}});}
 async function loadReferenceData() {
   const [cities] = await Promise.all([
     sbFetch('cities?select=id,name&order=name'),
@@ -134,7 +132,7 @@ function isUpcoming(startDate) {
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
-  tbody.innerHTML='<div class="ld-state"><div class="ld-spin"></div><div class="ld-txt">Loading...</div></div>';
+  tbody.innerHTML='<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>';
   try {
     const [events, locData] = await Promise.all([
       sbFetch('events?select=id,name,address,city_id,profile_image,speechify_link,start_date,end_date,start_time,end_time,slug,updated_at&order=start_date'),
@@ -149,9 +147,8 @@ async function loadAndRenderTable() {
     return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
   }).length;
     renderTable(evts);
-    const _st=gid('stat_total_events');if(_st)_st.textContent=evtCount;
-    const _ss=gid('stat_total_events_sub');if(_ss){const cities=new Set(evts.map(e=>e.city_id).filter(Boolean));_ss.textContent=`Across ${cities.size} ${cities.size===1?'city':'cities'}`;}
-    const _sc=gid('stat_upcoming_events');if(_sc)_sc.textContent=upcomingCount;
+    const _st=gid('stat-total');if(_st){_st.textContent=evtCount;const _ss=_st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');if(_ss)_ss.textContent='Total Events';}
+    const _sc=gid('stat-cities');if(_sc){_sc.textContent=upcomingCount;const _scs=_sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');if(_scs)_scs.textContent='Upcoming this month';}
     updateBadges(locCount, evtCount);
     const effective=[evts.map(e=>e.updated_at).filter(Boolean).sort().reverse()[0],_lastActionTime].filter(Boolean).sort().reverse()[0];
     if(effective)updateLastUpdated(effective);
@@ -225,7 +222,7 @@ async function handleProfileFile(file) {
   if (!file) return;
   const preview = gid('profile-preview');
   const dropZone = gid('profile-drop-zone');
-  preview.innerHTML = `<div class="img-uploading"><div class="ld-spin"></div>Uploading...</div>`;
+  preview.innerHTML = `<div class="img-uploading"><div class="loading-spinner"></div>Uploading...</div>`;
   preview.style.display = '';
   dropZone.style.display = 'none';
   try {
