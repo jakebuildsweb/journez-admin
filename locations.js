@@ -20,7 +20,6 @@ requireSession();
 
 let CITIES_DATA = [];
 let CATEGORIES_DATA = [];
-const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});const ts=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});const today=d.toDateString()===new Date().toDateString();document.querySelectorAll('[class*="card_component"]').forEach(card=>{const lbl=card.querySelector('[class*="card_label"]');if(lbl&&lbl.textContent.trim().toUpperCase().includes('LAST UPDATED')){const v=card.querySelector('[class*="card_value"]');const s=card.querySelector('[class*="card_sub"]');if(v)v.textContent=today?'Today':ds;if(s)s.textContent=today?ts:`${ds}, ${ts}`;}});}
 async function loadReferenceData() {
   const [cities, cats] = await Promise.all([
     sbFetch('cities?select=id,name&order=name'),
@@ -639,10 +638,6 @@ function downloadTemplate() {
   const exampleRow=['Example Cafe',exampleCityName,'30.4121','-88.8269',exampleCatName,'123 Main St','A local spot.','','','','','FALSE','9:00 AM-5:00 PM','9:00 AM-5:00 PM','9:00 AM-5:00 PM','9:00 AM-5:00 PM','9:00 AM-5:00 PM','',''];
   const csv=[headers.join(','),exampleRow.map(v=>v.includes(',')?`"${v}"`:v).join(',')].join('\n');
   const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='journez_template.csv';a.click();URL.revokeObjectURL(url);
-}
-function closeModal(id) {
-  gid(id).classList.remove('open');
-  document.body.style.overflow = '';
 }
 async function saveLocation() {
   const name     = gid('f-name').value.trim();
