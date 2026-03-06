@@ -137,6 +137,13 @@ function updateEventsStatCards(evts) {
 
   const cards = [...document.querySelectorAll('[class*="card_component"]')];
 
+  function findCardByLabel(text) {
+    return cards.find(card => {
+      const label = card.querySelector('[class*="card_label"]');
+      return label && label.textContent.trim().toLowerCase() === text.toLowerCase();
+    });
+  }
+
   function setCard(card, value, subtext) {
     if (!card) return;
     const valueEl = card.querySelector('[class*="card_value"]');
@@ -145,16 +152,12 @@ function updateEventsStatCards(evts) {
     if (subEl) subEl.textContent = subtext;
   }
 
-  const totalCard =
-    gid('stat-total')?.closest('[class*="card_component"]') || cards[0];
-
-  const monthCard =
-    gid('stat-cities')?.closest('[class*="card_component"]') || cards[1];
+  const totalCard = findCardByLabel('Total Events') || cards[0];
+  const monthCard = findCardByLabel('This Month') || cards[1];
 
   setCard(totalCard, evtCount, `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`);
   setCard(monthCard, currentMonthCount, 'This current month');
 }
-
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
