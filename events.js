@@ -72,7 +72,9 @@ function updateBadges(locCount, evtCount) {
 }
 let _lastActionTime=null;
 function updateLastUpdated(iso){if(iso)_lastActionTime=iso;const d=iso?new Date(iso):new Date();
-const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});const ts=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});const today=d.toDateString()===new Date().toDateString();document.querySelectorAll('[class*="card_component"]').forEach(card=>{const lbl=card.querySelector('[class*="card_label"]');if(lbl&&lbl.textContent.trim().toUpperCase().includes('LAST UPDATED')){const v=card.querySelector('[class*="card_value"]');const s=card.querySelector('[class*="card_sub"]');if(v)v.textContent=today?'Today':ds;if(s)s.textContent=today?ts:`${ds}, ${ts}`;}});}
+const ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});const ts=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});const today=d.toDateString()===new Date().toDateString();
+const v=gid('stat_last_updated');const s=gid('stat_last_updated_sub');
+if(v)v.textContent=today?'Today':ds;if(s)s.textContent=today?ts:`${ds}, ${ts}`;}
 async function loadReferenceData() {
   const [cities] = await Promise.all([
     sbFetch('cities?select=id,name&order=name'),
@@ -147,8 +149,9 @@ async function loadAndRenderTable() {
     return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
   }).length;
     renderTable(evts);
-    const _st=gid('stat-total');if(_st){_st.textContent=evtCount;const _ss=_st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');if(_ss)_ss.textContent='Total Events';}
-    const _sc=gid('stat-cities');if(_sc){_sc.textContent=upcomingCount;const _scs=_sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');if(_scs)_scs.textContent='Upcoming this month';}
+    const _st=gid('stat_total_events');if(_st)_st.textContent=evtCount;
+    const _ss=gid('stat_total_events_sub');if(_ss){const cities=new Set(evts.map(e=>e.city_id).filter(Boolean));_ss.textContent=`Across ${cities.size} ${cities.size===1?'city':'cities'}`;}
+    const _sc=gid('stat_upcoming_events');if(_sc)_sc.textContent=upcomingCount;
     updateBadges(locCount, evtCount);
     const effective=[evts.map(e=>e.updated_at).filter(Boolean).sort().reverse()[0],_lastActionTime].filter(Boolean).sort().reverse()[0];
     if(effective)updateLastUpdated(effective);
