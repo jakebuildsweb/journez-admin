@@ -1,70 +1,23 @@
-const SVG_CHECK=`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>`;
-const gid=id=>document.getElementById(id);
-const qsa=sel=>document.querySelectorAll(sel);
-const SUPABASE_URL  = 'https://zqwilzhwiwrqgjyptfoo.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpxd2lsemh3aXdycWdqeXB0Zm9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTk5Mzg1OTYsImV4cCI6MjAzNTUxNDU5Nn0.uWuBgX2d6PSiaveuAVBj-h6h6efHIiWIRGrsW0MH0qQ';
-const STORAGE_BUCKET = 'location-images';
-const LOGIN_URL='/admin-login',LOCATIONS_URL='/admin-locations';
-function getSession(){try{return JSON.parse(sessionStorage.getItem('jrn_session'));}catch(e){return null;}}
-function clearSession(){sessionStorage.removeItem('jrn_session');}
-function getAuthToken(){const s=getSession();return s?.access_token||null;}
-function signOut(){clearSession();window.location.href=LOGIN_URL;}
-(function(){const s=getSession();if(!s||!s.access_token){window.location.href=LOGIN_URL;return;}if(s.expires_at&&Date.now()/1000>s.expires_at-60){clearSession();window.location.href=LOGIN_URL;}})();
-async function sbFetch(path, opts = {}) {
-  const token=getAuthToken();
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...opts,
-    headers: {
-      'apikey': SUPABASE_ANON,
-      'Authorization': `Bearer ${token||SUPABASE_ANON}`,
-      'Content-Type': 'application/json',
-      'Prefer': opts.prefer || 'return=representation',
-      ...opts.headers,
-    },
-  });
-  if (!res.ok) {
-    if (res.status === 401) { clearSession(); window.location.href = LOGIN_URL; return; }
-    const err = await res.text();
-    throw new Error(`Supabase error ${res.status}: ${err}`);
-  }
-  if (res.status === 204) return null;
-  return res.json();
-}
-async function uploadImage(file, folder = 'profile') {
-  const token=getAuthToken();
-  const ext=file.name.split('.').pop();
-  const path=`${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const res  = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_ANON,
-      'Authorization': `Bearer ${token||SUPABASE_ANON}`,
-      'Content-Type': file.type,
-    },
-    body: file,
-  });
-  if (!res.ok) throw new Error('Image upload failed');
-  return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
-}
-function generateSlug(name) {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-}
-function showToast(msg, type = 'success') {
-  const wrap = gid('toast-wrap');
-  const t = document.createElement('div');
-  t.className = `toast ${type}`;
-  const icon = type === 'success'
-    ? '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>'
-    : '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>';
-  t.innerHTML = `${icon}<span>${msg}</span>`;
-  wrap.appendChild(t);
-  setTimeout(() => t.remove(), 3500);
-}
+const SVG_CHECK = ``;
+
+const {
+  gid,
+  qsa,
+  requireSession,
+  signOut,
+  sbFetch,
+  uploadImage,
+  generateSlug,
+  showToast,
+  openModal,
+  closeModal,
+  updateBadges,
+  updateLastUpdated,
+  getLastActionTime
+} = window.JournezAdminCore;
+
+requireSession();
+
 let CITIES_DATA = [];
 function updateBadges(locCount, evtCount) {
   const apply=()=>{
