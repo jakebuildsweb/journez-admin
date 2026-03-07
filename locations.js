@@ -1051,7 +1051,7 @@ async function saveLocation() {
     return;
   }
 
-  const resolvedCityId = newCityInput ? await getOrCreateCity(newCityInput) : cityVal;
+  const resolvedCityId = newCityInput ? await getOrCreateCity(newCityInput, lat, lng) : cityVal;
 
   let finalProfileUrl = profileImageUrl;
   const profileUrlInput = gid('f-profile-url').value.trim();
