@@ -1,3 +1,7 @@
+/* ========================================
+   Shared icons / helpers from admin-core
+======================================== */
+
 const SVG_CHECK = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M5 13l4 4L19 7"/></svg>';
 
 const {
@@ -16,13 +20,25 @@ const {
   getLastActionTime
 } = window.JournezAdminCore;
 
+/* Require an active admin session before anything else runs */
 requireSession();
 
-let CITIES_DATA = [];
-let editingId = null;
-let profileImageUrl = null;
-let _sortKey = 'date';
-let _sortDir = 'asc';
+/* ========================================
+   Page state
+======================================== */
+
+let CITIES_DATA = [];          // cached list of cities for selects / filters
+let editingId = null;          // current event being edited
+let profileImageUrl = null;    // uploaded or entered profile image URL
+let _sortKey = 'date';         // current table sort key
+let _sortDir = 'asc';          // current table sort direction
+
+/* ========================================
+   Reference data
+   Load cities into:
+   - event form city select
+   - table filter city select
+======================================== */
 
 async function loadReferenceData() {
   const cities = await sbFetch('cities?select=id,name&order=name');
@@ -32,15 +48,18 @@ async function loadReferenceData() {
   citySelects.forEach(id => {
     const sel = gid(id);
     if (!sel) return;
+
     const placeholder = sel.options[0];
     sel.innerHTML = '';
     sel.appendChild(placeholder);
+
     CITIES_DATA.forEach(c => {
       const o = document.createElement('option');
       o.value = c.id;
       o.textContent = c.name;
       sel.appendChild(o);
     });
+
     const newOpt = document.createElement('option');
     newOpt.value = '__new__';
     newOpt.textContent = '+ Add new city…';
@@ -52,6 +71,7 @@ async function loadReferenceData() {
     const allOpt = cityFilter.options[0];
     cityFilter.innerHTML = '';
     cityFilter.appendChild(allOpt);
+
     CITIES_DATA.forEach(c => {
       const o = document.createElement('option');
       o.value = c.id;
@@ -61,11 +81,13 @@ async function loadReferenceData() {
   }
 }
 
+/* Get a city display name from cached city data */
 function getCityName(cityId) {
   const c = CITIES_DATA.find(c => c.id === cityId);
   return c ? c.name : '—';
 }
 
+/* Find existing city by name, or create it if needed */
 async function getOrCreateCity(name, lat, lng) {
   if (!name || name === '__new__') return null;
 
@@ -90,6 +112,7 @@ async function getOrCreateCity(name, lat, lng) {
     ['f-city', 'city-select'].forEach(id => {
       const s = gid(id);
       if (!s) return;
+
       const o = document.createElement('option');
       o.value = city.id;
       o.textContent = city.name;
@@ -102,6 +125,11 @@ async function getOrCreateCity(name, lat, lng) {
   return null;
 }
 
+/* ========================================
+   Formatting helpers
+======================================== */
+
+/* Format 24-hour time to display style */
 function formatTime(t) {
   if (!t) return '';
   if (t.includes('AM') || t.includes('PM')) return t;
@@ -114,8 +142,10 @@ function formatTime(t) {
   return m === '00' ? `${h12}${ampm}` : `${h12}:${m}${ampm}`;
 }
 
+/* Format YYYY-MM-DD into readable date */
 function formatDate(dateStr) {
   if (!dateStr) return '—';
+
   const d = new Date(`${dateStr}T00:00:00`);
   return d.toLocaleDateString('en-US', {
     month: 'short',
@@ -123,6 +153,11 @@ function formatDate(dateStr) {
     year: 'numeric'
   });
 }
+
+/* ========================================
+   Stat cards
+   Updates the visible event stat cards
+======================================== */
 
 function updateEventsStatCards(evts) {
   const evtCount = evts.length;
@@ -164,6 +199,15 @@ function updateEventsStatCards(evts) {
   );
 }
 
+/* ========================================
+   Main table loader
+   Fetches events + location count, then:
+   - renders rows
+   - updates stat cards
+   - updates sidebar badges
+   - updates "last updated"
+======================================== */
+
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
@@ -195,6 +239,11 @@ async function loadAndRenderTable() {
   }
 }
 
+/* ========================================
+   Table rendering
+   Builds visible table rows from filtered events
+======================================== */
+
 function renderTable(events) {
   const tbody = gid('table-body');
   const filtered = applySortFilter(events);
@@ -224,8 +273,13 @@ function renderTable(events) {
     return `<div class="table-row" onclick="openEditModal('${e.id}')"><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${e.name}</div>${audioIcon}</div><div class="loc-addr">${e.address || '—'}</div></div><div><span class="city-tag">${cityName}</span></div><div><div style="font-size:12.5px;color:var(--gray-800);font-weight:500">${dateText}</div><div style="font-size:12px;color:var(--gray-400);margin-top:2px">${timeText}</div></div><div><a href="${e.website || '#'}" target="_blank" ${e.website ? '' : 'onclick="event.preventDefault()"'} style="font-size:12px;color:${e.website ? 'var(--accent)' : 'var(--gray-300)'};text-decoration:none">${e.website ? 'Visit site' : '—'}</a></div><div class="row-actions"><button class="icon-btn" onclick="event.stopPropagation();openEditModal('${e.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteEvent('${e.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
   }).join('');
 
+  /* Keep the full unfiltered list available for search/sort/filter rerenders */
   window._allEvents = events;
 }
+
+/* ========================================
+   Table sorting / filtering
+======================================== */
 
 function onSortChange(v) {
   [_sortKey, _sortDir] = v.split('-');
@@ -276,6 +330,11 @@ function filterTable() {
   if (window._allEvents) renderTable(window._allEvents);
 }
 
+/* ========================================
+   Form helpers
+======================================== */
+
+/* Show/hide "new city" input if user picks add-new option */
 function toggleNewCity(sel) {
   const n = gid('f-new-city');
   if (!n) return;
@@ -289,13 +348,19 @@ function toggleNewCity(sel) {
   }
 }
 
+/* Switch between image upload tab and image URL tab */
 function switchImgTab(field, mode, btn) {
   const tabs = btn.closest('.img-tabs').querySelectorAll('.img-tab');
   tabs.forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
+
   gid(`${field}-upload-panel`).style.display = mode === 'upload' ? '' : 'none';
   gid(`${field}-url-panel`).style.display = mode === 'url' ? '' : 'none';
 }
+
+/* ========================================
+   Image handling
+======================================== */
 
 async function handleProfileFile(file) {
   if (!file) return;
@@ -326,6 +391,7 @@ function clearProfileImage() {
   gid('profile-file-input').value = '';
 }
 
+/* Reset image UI back to default state */
 function resetImageState() {
   profileImageUrl = null;
   clearProfileImage();
@@ -334,6 +400,11 @@ function resetImageState() {
   gid('profile-upload-panel').style.display = '';
   gid('profile-url-panel').style.display = 'none';
 }
+
+/* ========================================
+   Event modal
+   Add / edit modal open + populate
+======================================== */
 
 function openAddModal() {
   editingId = null;
@@ -351,6 +422,7 @@ function openAddModal() {
   gid('f-lng').value = '';
   gid('f-website').value = '';
   gid('f-speechify').value = '';
+
   if (gid('f-new-city')) {
     gid('f-new-city').value = '';
     gid('f-new-city').style.display = 'none';
@@ -360,6 +432,7 @@ function openAddModal() {
   openModal('modal-event');
 }
 
+/* Show current image in edit mode */
 function setProfilePreview(url) {
   profileImageUrl = url;
   gid('profile-drop-zone').style.display = 'none';
@@ -402,6 +475,10 @@ async function openEditModal(id) {
   }
 }
 
+/* ========================================
+   Delete event
+======================================== */
+
 async function deleteEvent(id) {
   if (!confirm('Delete this event? ')) return;
 
@@ -410,6 +487,7 @@ async function deleteEvent(id) {
       method: 'DELETE',
       prefer: 'return=minimal'
     });
+
     showToast('Event deleted.');
     updateLastUpdated(new Date().toISOString());
     loadAndRenderTable();
@@ -418,6 +496,11 @@ async function deleteEvent(id) {
   }
 }
 
+/* ========================================
+   CSV import helpers
+======================================== */
+
+/* Basic CSV parser that handles quoted values */
 function parseImportCSV(text) {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const nonEmpty = lines.filter(l => l.trim());
@@ -460,6 +543,7 @@ function parseImportCSV(text) {
   return { headers, rows };
 }
 
+/* Reset import modal back to upload state */
 function resetImportModal() {
   gid('imp-upload').style.display = '';
   gid('imp-preview').style.display = 'none';
@@ -469,6 +553,7 @@ function resetImportModal() {
   window._importRows = null;
 }
 
+/* Open import modal and show existing city hint */
 function openImportModal() {
   resetImportModal();
 
@@ -480,6 +565,7 @@ function openImportModal() {
   openModal('modal-import');
 }
 
+/* Read imported file, validate it, and build preview rows */
 async function handleImportFile(file) {
   if (!file) return;
 
@@ -531,6 +617,7 @@ async function handleImportFile(file) {
   showImportPreview(processed, file.name);
 }
 
+/* Render import preview before final confirmation */
 function showImportPreview(rows, filename) {
   const addCount = rows.filter(r => r.status === 'add').length;
   const skipCount = rows.filter(r => r.status === 'skip').length;
@@ -563,6 +650,7 @@ function showImportPreview(rows, filename) {
   }
 }
 
+/* Final import step: insert valid rows into Supabase */
 async function confirmImport() {
   const rows = (window._importRows || []).filter(r => r.status === 'add');
   if (!rows.length) return;
@@ -624,9 +712,11 @@ async function confirmImport() {
   );
 }
 
+/* Download a ready-to-fill CSV template */
 function downloadTemplate() {
   const headers = 'name,city,start_date,end_date,start_time,end_time,address,description,website,profile_image,speechify_link,latitude,longitude'.split(',');
   const exampleCityName = CITIES_DATA[0]?.name || 'Ocean Springs';
+
   const exampleRow = [
     'Example Festival',
     exampleCityName,
@@ -650,12 +740,19 @@ function downloadTemplate() {
 
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement('a');
   a.href = url;
   a.download = 'journez_events_template.csv';
   a.click();
+
   URL.revokeObjectURL(url);
 }
+
+/* ========================================
+   Save event
+   Handles both add and edit
+======================================== */
 
 async function saveEvent() {
   const name = gid('f-name').value.trim();
@@ -744,34 +841,59 @@ async function saveEvent() {
   }
 }
 
+/* ========================================
+   Close modals when clicking backdrop
+======================================== */
+
 ['modal-event', 'modal-import'].forEach(id => {
   gid(id)?.addEventListener('click', e => {
     if (e.target === gid(id)) closeModal(id);
   });
 });
 
+/* ========================================
+   Page boot
+   Builds page controls and wires events
+======================================== */
+
 document.addEventListener('DOMContentLoaded', async function () {
+
+  /* Sidebar logo */
   const logoEl = document.querySelector('[class*="sidebar_logo-icon"]');
   if (logoEl) {
     logoEl.style.background = 'none';
     logoEl.innerHTML = '<img src="https://cdn.prod.website-files.com/63e53396a34018da90230c8e/66b1545192b2665e1e65817d_Journez%20Logo.svg" style="width:32px;height:32px">';
   }
 
+  /* Build search / filter / sort controls */
   const sectionHeader = gid('section-header');
   if (sectionHeader) {
+
     const controls = document.createElement('div');
     controls.className = 'section-right';
+
     controls.innerHTML = `
       <div class="search-bar">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
         <input type="text" id="search-input" placeholder="Search events">
       </div>
+
       <div class="city-filter">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-        <select id="city-select"><option value="">All Cities</option></select>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4"/>
+        </svg>
+        <select id="city-select">
+          <option value="">All Cities</option>
+        </select>
       </div>
+
       <div class="city-filter">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path d="M3 6h18M7 12h10M11 18h2"/>
+        </svg>
         <select id="sort-select" onchange="onSortChange(this.value)">
           <option value="date-asc">Date ↑</option>
           <option value="date-desc">Date ↓</option>
@@ -782,31 +904,42 @@ document.addEventListener('DOMContentLoaded', async function () {
           <option value="updated-desc">Updated ↓</option>
           <option value="updated-asc">Updated ↑</option>
         </select>
-      </div>`;
+      </div>
+    `;
+
     sectionHeader.appendChild(controls);
+
     gid('search-input').addEventListener('input', filterTable);
     gid('city-select').addEventListener('change', filterTable);
   }
 
+  /* Sign out button in top bar */
   const pageHeader = document.querySelector('[class*="topbar_right"]');
   if (pageHeader && !gid('btn-signout')) {
+
     const signoutBtn = document.createElement('button');
+
     Object.assign(signoutBtn, {
       id: 'btn-signout',
       className: 'btn btn-secondary',
       textContent: 'Sign out',
       onclick: signOut
     });
+
     pageHeader.appendChild(signoutBtn);
   }
 
+  /* Ensure table body exists */
   const tableWrap = gid('table-wrap');
   if (tableWrap && !gid('table-body')) {
+
     const tbody = document.createElement('div');
     tbody.id = 'table-body';
+
     tableWrap.appendChild(tbody);
   }
 
+  /* Top actions */
   gid('btn-add-top')?.addEventListener('click', e => {
     e.preventDefault();
     openAddModal();
@@ -817,9 +950,45 @@ document.addEventListener('DOMContentLoaded', async function () {
     openImportModal();
   });
 
+  /* CSV upload: keep only drag/drop zone + click zone */
+  const impFile = gid('imp-file');
+  const impUpload = gid('imp-upload');
+
+  if (impFile) impFile.style.display = 'none';
+
+  if (impUpload && impFile) {
+    impUpload.style.cursor = 'pointer';
+
+    impUpload.addEventListener('click', e => {
+      if (e.target.closest('button,a')) return;
+      impFile.click();
+    });
+
+    impUpload.addEventListener('dragover', e => {
+      e.preventDefault();
+    });
+
+    impUpload.addEventListener('drop', e => {
+      e.preventDefault();
+
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleImportFile(file);
+    });
+
+    impFile.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (file) handleImportFile(file);
+    });
+  }
+
+  /* Final startup */
   await loadReferenceData();
   loadAndRenderTable();
 });
+
+/* ========================================
+   Expose needed functions to inline HTML
+======================================== */
 
 window.signOut = signOut;
 window.saveEvent = saveEvent;
