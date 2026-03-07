@@ -140,7 +140,7 @@ function updateEventsStatCards(evts) {
   function findCardByLabel(text) {
     return cards.find(card => {
       const label = card.querySelector('[class*="card_label"]');
-      return label && label.textContent.trim().toLowerCase() === text.toLowerCase();
+      return label && label.textContent.trim() === text;
     });
   }
 
@@ -152,11 +152,17 @@ function updateEventsStatCards(evts) {
     if (subEl) subEl.textContent = subtext;
   }
 
-  const totalCard = findCardByLabel('Total Events') || cards[0];
-  const monthCard = findCardByLabel('This Month') || cards[1];
+  setCard(
+    findCardByLabel('Total Events'),
+    evtCount,
+    `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`
+  );
 
-  setCard(totalCard, evtCount, `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`);
-  setCard(monthCard, currentMonthCount, 'This current month');
+  setCard(
+    findCardByLabel('Upcoming Events'),
+    currentMonthCount,
+    'This current month'
+  );
 }
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
