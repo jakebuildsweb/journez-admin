@@ -139,7 +139,6 @@ async function loadReferenceData() {
    Hours parsing / formatting
 ======================================== */
 
-/* Convert various time strings into normalized 24h format */
 function parseHourStr(str) {
   if (!str || str.toLowerCase() === 'closed' || str.trim() === '') return null;
   if (/^\d{1,2}:\d{2}$/.test(str.trim())) return str.trim().padStart(5, '0');
@@ -157,7 +156,6 @@ function parseHourStr(str) {
   return `${String(h).padStart(2, '0')}:${min}`;
 }
 
-/* Normalize stored hours object into short-day format used by UI */
 function normalizeHours(raw) {
   if (!raw) return {};
   const out = {};
@@ -177,7 +175,6 @@ function normalizeHours(raw) {
   return out;
 }
 
-/* Format time for display */
 function formatTime(t) {
   if (!t) return '';
   if (t === 'Closed' || t === 'Open 24 Hours') return t;
@@ -205,7 +202,6 @@ function getCatName(catId) {
   return c ? c.name : null;
 }
 
-/* Find existing city by name, or create it if needed */
 async function getOrCreateCity(name, lat, lng) {
   if (!name || name === '__new__') return null;
 
@@ -245,11 +241,6 @@ async function getOrCreateCity(name, lat, lng) {
 
 /* ========================================
    Main table loader
-   Fetches locations + event count, then:
-   - renders rows
-   - updates stat cards
-   - updates sidebar badges
-   - updates "last updated"
 ======================================== */
 
 async function loadAndRenderTable() {
@@ -346,7 +337,6 @@ function renderTable(locations) {
     return `<div class="table-row" onclick="openEditModal('${l.id}')"><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${l.name}</div>${focalDot}${audioIcon}</div><div class="loc-addr">${l.address || '—'}</div></div><div><span class="city-tag">${cityName}</span></div><div>${catTag}</div><div>${hoursHtml}</div><div class="row-actions"><button class="icon-btn" onclick="event.stopPropagation();openEditModal('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteLocation('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
   }).join('');
 
-  /* Keep full data available for rerendering during filter/sort */
   window._allLocations = locations;
 }
 
@@ -428,7 +418,6 @@ async function deleteLocation(id) {
    Image handling
 ======================================== */
 
-/* Switch between upload tab and URL tab */
 function switchImgTab(field, mode, btn) {
   const tabs = btn.closest('.img-tabs').querySelectorAll('.img-tab');
   tabs.forEach(t => t.classList.remove('active'));
@@ -438,7 +427,6 @@ function switchImgTab(field, mode, btn) {
   gid(`${field}-url-panel`).style.display = mode === 'url' ? '' : 'none';
 }
 
-/* Upload a single profile image */
 async function handleProfileFile(file) {
   if (!file) return;
 
@@ -468,7 +456,6 @@ function clearProfileImage() {
   gid('profile-file-input').value = '';
 }
 
-/* Upload one or more gallery images */
 async function handleGalleryFiles(files) {
   for (const file of files) {
     try {
@@ -480,7 +467,6 @@ async function handleGalleryFiles(files) {
   }
 }
 
-/* Add a gallery item to UI + local state */
 function addGalleryItem(url, label) {
   if (galleryImageUrls.includes(url)) return;
 
@@ -497,13 +483,11 @@ function addGalleryItem(url, label) {
   grid.insertBefore(item, addBtn);
 }
 
-/* Remove one gallery item from UI + local state */
 function removeGalleryItem(btn, url) {
   galleryImageUrls = galleryImageUrls.filter(u => u !== url);
   btn.closest('.gallery-item').remove();
 }
 
-/* Reset all image UI and image-related state */
 function resetImageState() {
   profileImageUrl = null;
   galleryImageUrls = [];
@@ -526,20 +510,17 @@ function resetImageState() {
    Hours editor UI
 ======================================== */
 
-/* Build the weekly hours editor markup */
 function buildHoursEditor() {
   gid('hours-editor').innerHTML = DAYS.map(d => `
 <div class="hours-row"><div class="hours-day">${d.label}</div><div class="hours-controls"><label class="toggle"><input type="checkbox" id="tog-${d.id}" onchange="toggleDay('${d.id}',this.checked)"><span class="toggle-track"></span></label><div class="hours-time-group" id="times-${d.id}" style="display:none"><input type="time" class="time-input" id="open-${d.id}" value="09:00" onchange="onTimeChange('${d.id}')"><span class="time-sep">to</span><input type="time" class="time-input" id="close-${d.id}" value="17:00" onchange="onTimeChange('${d.id}')"><button class="chip" id="chip24-${d.id}" onclick="set24('${d.id}')">24 hrs</button></div><div class="hours-closed-label" id="closed-${d.id}">Closed</div></div></div>`).join('');
 }
 
-/* Turn a day on/off */
 function toggleDay(day, isOpen) {
   gid('times-' + day).style.display = isOpen ? 'flex' : 'none';
   gid('closed-' + day).style.display = isOpen ? 'none' : 'flex';
   updateDot(day);
 }
 
-/* Set selected day to 24-hour schedule */
 function set24(day) {
   gid('open-' + day).value = '00:00';
   gid('close-' + day).value = '23:59';
@@ -547,13 +528,11 @@ function set24(day) {
   updateDot(day);
 }
 
-/* Remove 24-hour chip state when times change manually */
 function onTimeChange(day) {
   gid('chip24-' + day).classList.remove('active');
   updateDot(day);
 }
 
-/* Update preview dot color for a day */
 function updateDot(day) {
   const tog = gid('tog-' + day);
   const open = gid('open-' + day);
@@ -574,7 +553,6 @@ function updateDot(day) {
   }
 }
 
-/* Set full state for one day */
 function setDayState(day, isOpen, openVal, closeVal) {
   gid('tog-' + day).checked = isOpen;
   if (openVal) gid('open-' + day).value = openVal;
@@ -585,7 +563,6 @@ function setDayState(day, isOpen, openVal, closeVal) {
   if (chip) chip.classList.toggle('active', isOpen && openVal === '00:00' && closeVal === '23:59');
 }
 
-/* Copy Monday hours to other checked days */
 function copyMonToAll() {
   const o = gid('open-mon').value;
   const c = gid('close-mon').value;
@@ -600,7 +577,6 @@ function copyMonToAll() {
   });
 }
 
-/* Quick-fill common open patterns */
 function setPattern(pattern) {
   const wkd = ['mon', 'tue', 'wed', 'thu', 'fri'];
   const wkn = ['sat', 'sun'];
@@ -618,7 +594,6 @@ function setPattern(pattern) {
   });
 }
 
-/* Collect hours from editor into DB-ready format */
 function collectHours() {
   const hours = {};
 
@@ -635,7 +610,6 @@ function collectHours() {
   return Object.keys(hours).length > 0 ? hours : null;
 }
 
-/* Populate hours editor from stored DB value */
 function populateHours(raw) {
   const hours = normalizeHours(raw);
   DAYS.forEach(d => {
@@ -648,7 +622,6 @@ function populateHours(raw) {
    Form helpers
 ======================================== */
 
-/* Show/hide "new city" input if needed */
 function toggleNewCity(sel) {
   const n = gid('f-new-city');
   if (!n) return;
@@ -664,7 +637,6 @@ function toggleNewCity(sel) {
 
 /* ========================================
    Location modal
-   Add / edit modal open + populate
 ======================================== */
 
 function openAddModal() {
@@ -695,7 +667,6 @@ function openAddModal() {
   openModal('modal-location');
 }
 
-/* Show current profile image in edit mode */
 function setProfilePreview(url) {
   profileImageUrl = url;
   gid('profile-drop-zone').style.display = 'none';
@@ -760,7 +731,6 @@ function resetImportModal() {
   window._importRows = null;
 }
 
-/* Basic CSV parser that handles quoted values */
 function parseCSV(text) {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const nonEmpty = lines.filter(l => l.trim());
@@ -804,10 +774,8 @@ function parseCSV(text) {
   return { headers, rows };
 }
 
-/* CSV columns used for weekly hours import */
 const CSV_DAY_COLS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-/* Build operating_hours object from CSV row values */
 function hoursFromCSVRow(row) {
   const hours = {};
 
@@ -826,7 +794,6 @@ function hoursFromCSVRow(row) {
   return Object.keys(hours).length > 0 ? hours : null;
 }
 
-/* Read CSV, validate rows, and build import preview */
 async function handleImportFile(file) {
   if (!file) return;
 
@@ -884,7 +851,6 @@ async function handleImportFile(file) {
   showImportPreview(processed, file.name);
 }
 
-/* Render import preview before final confirm */
 function showImportPreview(rows, filename) {
   const addCount = rows.filter(r => r.status === 'add').length;
   const skipCount = rows.filter(r => r.status === 'skip').length;
@@ -919,7 +885,6 @@ function showImportPreview(rows, filename) {
   }
 }
 
-/* Final import step: insert valid rows into Supabase */
 async function confirmImport() {
   const rows = (window._importRows || []).filter(r => r.status === 'add');
   if (!rows.length) return;
@@ -979,7 +944,6 @@ async function confirmImport() {
   );
 }
 
-/* Download a ready-to-fill CSV template */
 function downloadTemplate() {
   const headers = 'name,city,latitude,longitude,category,address,description,website,phone,profile_image,audio_file_link,is_focal_point,hours_monday,hours_tuesday,hours_wednesday,hours_thursday,hours_friday,hours_saturday,hours_sunday'.split(',');
   const exampleCityName = CITIES_DATA[0]?.name || 'Ocean Springs';
@@ -1025,7 +989,6 @@ function downloadTemplate() {
 
 /* ========================================
    Save location
-   Handles both add and edit
 ======================================== */
 
 async function saveLocation() {
@@ -1125,7 +1088,6 @@ async function saveLocation() {
 
 /* ========================================
    Page boot
-   Builds page controls and wires events
 ======================================== */
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -1214,6 +1176,40 @@ document.addEventListener('DOMContentLoaded', async function () {
     e.preventDefault();
     openImportModal();
   });
+
+  /* CSV upload: match Events page behavior */
+  const importFileInput = gid('import-file-input');
+  const importStepUpload = gid('import-step-upload');
+
+  if (importFileInput) {
+    importFileInput.removeAttribute('onchange');
+    importFileInput.style.display = 'none';
+  }
+
+  if (importStepUpload && importFileInput) {
+    importStepUpload.style.cursor = 'pointer';
+
+    importStepUpload.addEventListener('click', e => {
+      if (e.target.closest('button,a')) return;
+      importFileInput.click();
+    });
+
+    importStepUpload.addEventListener('dragover', e => {
+      e.preventDefault();
+    });
+
+    importStepUpload.addEventListener('drop', e => {
+      e.preventDefault();
+
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleImportFile(file);
+    });
+
+    importFileInput.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (file) handleImportFile(file);
+    });
+  }
 
   /* Final startup */
   await loadReferenceData();
