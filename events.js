@@ -178,18 +178,10 @@ async function loadAndRenderTable() {
 
     const evts = events || [];
     const locCount = (locData || []).length;
-   const evtCount = evts.length;
+    const evtCount = evts.length;
 
-renderTable(evts);
-updateEventsStatCards(evts);
-
-    const _sc = gid('stat-cities');
-    if (_sc) {
-      _sc.textContent = cityCount;
-      const _scs = _sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
-      if (_scs) _scs.textContent = 'Active in app';
-    }
-
+    renderTable(evts);
+    updateEventsStatCards(evts);
     updateBadges(locCount, evtCount);
 
     const effective = [
@@ -772,7 +764,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     controls.innerHTML = `
       <div class="search-bar">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        <input type="text" id="search-input">
+        <input type="text" id="search-input" placeholder="Search events">
       </div>
       <div class="city-filter">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
@@ -792,7 +784,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         </select>
       </div>`;
     sectionHeader.appendChild(controls);
-    gid('search-input')?.setAttribute('placeholder', 'Search events');
     gid('search-input').addEventListener('input', filterTable);
     gid('city-select').addEventListener('change', filterTable);
   }
