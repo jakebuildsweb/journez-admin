@@ -135,35 +135,35 @@ function updateEventsStatCards(evts) {
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   }).length;
 
-  const cards = [...document.querySelectorAll('[class*="card_component"]')];
+  const labels = [...document.querySelectorAll('[class*="card_label"]')];
 
-  function findCardByLabel(text) {
-    return cards.find(card => {
-      const label = card.querySelector('[class*="card_label"]');
-      return label && label.textContent.trim() === text;
-    });
-  }
+  function setCardByLabel(labelText, value, subtext) {
+    const labelEl = labels.find(el => el.textContent.trim() === labelText);
+    if (!labelEl) return;
 
-  function setCard(card, value, subtext) {
+    const card = labelEl.closest('[class*="card_component"]');
     if (!card) return;
+
     const valueEl = card.querySelector('[class*="card_value"]');
     const subEl = card.querySelector('[class*="card_sub"]');
+
     if (valueEl) valueEl.textContent = String(value);
     if (subEl) subEl.textContent = subtext;
   }
 
-  setCard(
-    findCardByLabel('Total Events'),
+  setCardByLabel(
+    'Total Events',
     evtCount,
     `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`
   );
 
-  setCard(
-    findCardByLabel('Upcoming Events'),
+  setCardByLabel(
+    'Upcoming Events',
     currentMonthCount,
     'This current month'
   );
 }
+
 async function loadAndRenderTable() {
   const tbody = gid('table-body');
   if (!tbody) return;
