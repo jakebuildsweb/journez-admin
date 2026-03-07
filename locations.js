@@ -1035,6 +1035,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         </select>
       </div>`;
     sectionHeader.appendChild(controls);
+    gid('search-input')?.setAttribute('placeholder', 'Search locations');
     gid('search-input').addEventListener('input', filterTable);
     gid('city-select').addEventListener('change', filterTable);
   }
