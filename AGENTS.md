@@ -16,11 +16,9 @@ The location dataset itself and the pipeline that produces the CSVs → `../asse
 Clone of **`jakebuildsweb/journez-admin`** (GitHub, public). `origin` is the real remote — commits and pushes here go to the actual repo.
 
 ## Branches — consolidated 2026-08-05
-**`main` is the single source of truth. Work on `main`.**
+**`main` is the single source of truth, and the only branch.**
 
-History: production used to run from a branch called `jakebuildsweb-patch-1` while `main` sat stale, diverged, and missing `admin-core.js` entirely (its HEAD was literally `Delete admin-core.js`). On 2026-08-05 that branch was merged into `main`, so `main` now matches what production runs, byte for byte.
-
-`jakebuildsweb-patch-1` is retained **only** until the Webflow script refs stop pointing at it — see the pending step below. Once the pages load from `main`, that branch can be deleted.
+History: production used to run from a branch called `jakebuildsweb-patch-1` while `main` sat stale, diverged, and missing `admin-core.js` entirely (its HEAD was literally `Delete admin-core.js`). On 2026-08-05 that branch was merged into `main`, both Webflow pages were repointed at `main`, the site was published, and the old branch was deleted after verifying nothing referenced it.
 
 ## How a change reaches production
 Editing files here does **not** update the live site. The Webflow pages load this code over jsDelivr from GitHub:
@@ -33,24 +31,21 @@ Page IDs: `admin-locations` = `641b296798b82f3f8410de21`, `admin-events` = `69aa
 
 **Prefer pinned commit SHAs over branch refs.** A branch ref auto-deploys on every push and jsDelivr caches it for ~12h, so you get delayed, unpredictable rollouts. A pinned SHA is immutable and cached permanently — deploys happen only when you deliberately bump the ref.
 
-### ⏳ PENDING: repoint Webflow to `main`
-Consolidation is done in git but the live pages still reference the old refs. Until this is finished, **do not delete `jakebuildsweb-patch-1`** — `admin-core.js` loads from that branch and deleting it takes the admin portal down immediately.
+### Currently live (as of 2026-08-05)
+Both pages are pinned to commit **`f4c07ea4458a4e5a4efbe5cfcbd378d452582681`**:
 
-Target SHA: `f4c07ea4458a4e5a4efbe5cfcbd378d452582681` (verified serving correctly on jsDelivr for all three files).
+- `admin-locations` → `admin-core.js` + `locations.js` at that SHA
+- `admin-events` → `admin-core.js` + `events.js` at that SHA
 
-`admin-locations` footer — replace the last two `<script>` lines with:
-```html
-<script src="https://cdn.jsdelivr.net/gh/jakebuildsweb/journez-admin@f4c07ea4458a4e5a4efbe5cfcbd378d452582681/admin-core.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/jakebuildsweb/journez-admin@f4c07ea4458a4e5a4efbe5cfcbd378d452582681/locations.js"></script>
-```
+Each footer also contains one or two **commented-out** `@main/...?v=1` script lines left over from the old workflow. They are inert — don't mistake them for the active refs.
 
-`admin-events` footer — replace the last two `<script>` lines with:
-```html
-<script src="https://cdn.jsdelivr.net/gh/jakebuildsweb/journez-admin@f4c07ea4458a4e5a4efbe5cfcbd378d452582681/admin-core.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/jakebuildsweb/journez-admin@f4c07ea4458a4e5a4efbe5cfcbd378d452582681/events.js"></script>
-```
+### Editing the footer safely
+The footer block is ~8–10KB of modal HTML with the script tags as the last two lines. `set_page_freeform_code` replaces the **entire** block, so never hand-retype it. The safe procedure, used for the 2026-08-05 repoint:
 
-Then publish, hard-reload both admin pages, confirm the location/event lists load and the CSV import modal opens. Only then delete the old branch.
+1. `get_page_freeform_code` and save the current footer to a local backup file.
+2. Do the ref swap **programmatically** (string replace on the exact old tag), and `diff` old vs new to prove only the script lines changed.
+3. Sanity-check that every `onclick="handler(...)"` in the footer is still exported by the matching `.js` (`window.handler = ...`) — this catches a dropped element better than eyeballing.
+4. `set_page_freeform_code`, publish, then verify the live HTML with `curl | grep jsdelivr`.
 
 ## Invariants (never violate)
 - **Never commit secrets.** `admin-core.js` contains the Supabase URL and the **anon** key — public by design, RLS enforces access. Any service-role key, or any third-party API key (e.g. Speechify), must never land here — those go through a Supabase Edge Function. Mirrors the root `CLAUDE.md` hard rule.
@@ -58,7 +53,7 @@ Then publish, hard-reload both admin pages, confirm the location/event lists loa
 - CSV importer behaviour is contract, not implementation detail — `../assets/data/AGENTS.md` documents the exact contract the 13 shipped CSVs rely on. Changing validation, city/category matching, or hours parsing can silently break a 271-row import.
 
 ## Confuses new engineers
-- **A push does not deploy.** The refs are pinned to commit SHAs; the Webflow ref must be bumped and the site republished.
+- **A push does not deploy.** Both pages are pinned to commit SHAs, so a push changes nothing live until the Webflow ref is bumped and the site republished. (This is deliberate — `admin-core.js` used to sit on a branch ref and auto-deploy, which made rollouts unpredictable.)
 - The events CSV schema is **not** the locations schema — different columns entirely (dates/times, no category, no hours, no phone).
 - An unmatched CSV city name does not error on import — the row silently inserts with `city_id: null`. See the importer contract in `../assets/data/AGENTS.md`.
 - The footer custom code in Webflow is ~20KB of modal HTML with the script tags at the very end. When editing refs, change only those last lines — rewriting the whole block risks breaking the page's modals.
