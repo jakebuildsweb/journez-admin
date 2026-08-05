@@ -58,7 +58,7 @@ const DAYS_LETTER = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 /* Category color styles used in the table */
 const CAT_COLORS = {
-  'Events': { bg: '#fdf4ff', color: '#9333ea' },
+  'Event': { bg: '#fdf4ff', color: '#9333ea' },
   'Focal Point': { bg: '#f2f2f0', color: '#5a5a54' },
   'Things To Do': { bg: '#fff1f2', color: '#dc2626' },
   'What to Eat': { bg: '#eff4ff', color: '#2563eb' },
@@ -164,6 +164,11 @@ function normalizeHours(raw) {
   for (const [key, val] of Object.entries(raw)) {
     const shortKey = DAY_FULL_TO_SHORT[key] || (DAY_SHORT_TO_FULL[key] ? key : null);
     if (!shortKey) continue;
+
+    if (String(val.open || '').trim().toLowerCase() === 'open 24 hours') {
+      out[shortKey] = { open: '00:00', close: '23:59' };
+      continue;
+    }
 
     const openStr = parseHourStr(val.open);
     const closeStr = parseHourStr(val.close);
@@ -723,12 +728,22 @@ function openImportModal() {
   openModal('modal-import');
 }
 
+function importBackBtn() {
+  return document.querySelector('#modal-import .modal-footer button[onclick*="resetImportModal"]');
+}
+
+function setImportBackVisible(visible) {
+  const b = importBackBtn();
+  if (b) b.style.display = visible ? '' : 'none';
+}
+
 function resetImportModal() {
   gid('import-step-upload').style.display = '';
   gid('import-step-preview').style.display = 'none';
   gid('btn-import-confirm').style.display = 'none';
   gid('import-file-input').value = '';
   gid('import-preview-content').innerHTML = '';
+  setImportBackVisible(false);
   window._importRows = null;
 }
 
@@ -777,22 +792,37 @@ function parseCSV(text) {
 
 const CSV_DAY_COLS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
+function to12Hour(t) {
+  const [h, m] = t.split(':');
+  const hr = parseInt(h, 10);
+  const ampm = hr >= 12 ? 'PM' : 'AM';
+  return `${hr % 12 || 12}:${m} ${ampm}`;
+}
+
 function hoursFromCSVRow(row) {
   const hours = {};
+  const CLOSED = () => ({ open: 'Closed', close: 'Closed' });
 
   CSV_DAY_COLS.forEach(day => {
     const val = (row[`hours_${day}`] || '').trim();
-    if (!val || val.toLowerCase() === 'closed' || val === '') return;
+    const ALLDAY = () => ({ open: 'Open 24 Hours', close: '' });
+
+    if (!val || val.toLowerCase() === 'closed') { hours[day] = CLOSED(); return; }
+    if (/^open\s*24\s*(hours|hrs)$/i.test(val)) { hours[day] = ALLDAY(); return; }
 
     const parts = val.split(/\s*[-–]\s*/);
-    if (parts.length === 2) {
-      const open = parseHourStr(parts[0].trim());
-      const close = parseHourStr(parts[1].trim());
-      if (open && close) hours[day] = { open, close };
-    }
+    if (parts.length !== 2) { hours[day] = CLOSED(); return; }
+
+    const open = parseHourStr(parts[0].trim());
+    const close = parseHourStr(parts[1].trim());
+    if (!open || !close) { hours[day] = CLOSED(); return; }
+
+    if (open === '00:00' && close === '23:59') { hours[day] = ALLDAY(); return; }
+
+    hours[day] = { open: to12Hour(open), close: to12Hour(close) };
   });
 
-  return Object.keys(hours).length > 0 ? hours : null;
+  return hours;
 }
 
 async function handleImportFile(file) {
@@ -877,6 +907,7 @@ function showImportPreview(rows, filename) {
   gid('import-preview-content').innerHTML = summaryHtml + `<div class="import-preview-table">${headerHtml}${rowsHtml}</div>`;
   gid('import-step-upload').style.display = 'none';
   gid('import-step-preview').style.display = '';
+  setImportBackVisible(true);
 
   if (addCount > 0) {
     gid('btn-import-confirm').style.display = '';
