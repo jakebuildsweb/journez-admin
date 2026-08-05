@@ -8,6 +8,7 @@ const {
   gid,
   qsa,
   requireSession,
+  requireAdmin,
   signOut,
   sbFetch,
   uploadImage,
@@ -1091,6 +1092,9 @@ async function saveLocation() {
 ======================================== */
 
 document.addEventListener('DOMContentLoaded', async function () {
+  /* Admin allowlist check — a valid session is not enough */
+  if (!(await requireAdmin())) return;
+
   /* Sidebar logo */
   const logoEl = document.querySelector('[class*="sidebar_logo-icon"]');
   if (logoEl) {

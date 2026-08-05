@@ -47,6 +47,15 @@ The footer block is ~8–10KB of modal HTML with the script tags as the last two
 3. Sanity-check that every `onclick="handler(...)"` in the footer is still exported by the matching `.js` (`window.handler = ...`) — this catches a dropped element better than eyeballing.
 4. `set_page_freeform_code`, publish, then verify the live HTML with `curl | grep jsdelivr`.
 
+## Auth — the database is the enforcement point
+Write access to `locations`, `cities`, `categories`, `events` and the `location-images` bucket is gated by RLS policies that call `public.is_admin()`, which checks membership in `public.admin_users`. Seeded 2026-08-05 with `admin@journez.app`. Migration and verification notes: `../docs/MIGRATION-admin-rls.sql`.
+
+`requireSession()` only checks that a `jrn_session` exists and has not expired. `requireAdmin()` additionally calls the `is_admin` RPC and redirects non-admins to `/admin-login?denied=1`; both page scripts call it first thing in their `DOMContentLoaded` handler.
+
+**That client check is UX, not security, and must never be treated as the control.** `sbFetch` sends the user's own JWT straight to PostgREST, so any signed-in user can bypass the portal entirely with curl. If you add a new admin-only table or bucket, the RLS policy is the thing that protects it — granting the front-end a new button protects nothing.
+
+To add or remove an admin, insert into or delete from `public.admin_users`. It takes effect on the next query; no token refresh and no redeploy. Do not reach for a JWT/`app_metadata` claim instead — that was considered and rejected (`../docs/DECISIONS.md`, 2026-08-05) because revocation then waits on token expiry.
+
 ## Invariants (never violate)
 - **Never commit secrets.** `admin-core.js` contains the Supabase URL and the **anon** key — public by design, RLS enforces access. Any service-role key, or any third-party API key (e.g. Speechify), must never land here — those go through a Supabase Edge Function. Mirrors the root `CLAUDE.md` hard rule.
 - **Never delete a branch or commit that a live `<script src>` still points at.** jsDelivr resolves refs at request time; the page 404s the moment the ref disappears.

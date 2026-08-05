@@ -51,6 +51,23 @@
     window.location.href = LOGIN_URL;
   }
 
+  async function isAdmin() {
+    try {
+      return (await sbFetch('rpc/is_admin', { method: 'POST', body: '{}' })) === true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  async function requireAdmin() {
+    if (!requireSession()) return false;
+    if (await isAdmin()) return true;
+
+    clearSession();
+    window.location.href = `${LOGIN_URL}?denied=1`;
+    return false;
+  }
+
   async function sbFetch(path, opts = {}) {
     const token = getAuthToken();
 
@@ -198,6 +215,8 @@
     clearSession,
     getAuthToken,
     requireSession,
+    isAdmin,
+    requireAdmin,
     signOut,
     sbFetch,
     uploadImage,
