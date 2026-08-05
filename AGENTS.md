@@ -31,11 +31,15 @@ Page IDs: `admin-locations` = `641b296798b82f3f8410de21`, `admin-events` = `69aa
 
 **Prefer pinned commit SHAs over branch refs.** A branch ref auto-deploys on every push and jsDelivr caches it for ~12h, so you get delayed, unpredictable rollouts. A pinned SHA is immutable and cached permanently — deploys happen only when you deliberately bump the ref.
 
-### Currently live (as of 2026-08-05)
-Both pages are pinned to commit **`f4c07ea4458a4e5a4efbe5cfcbd378d452582681`**:
+### Currently live (as of 2026-08-05, second deploy)
+Both pages are pinned to commit **`0879fe7d43c332473976db73e6777ffba7902819`**:
 
 - `admin-locations` → `admin-core.js` + `locations.js` at that SHA
 - `admin-events` → `admin-core.js` + `events.js` at that SHA
+
+Previous pin was `f4c07ea4458a4e5a4efbe5cfcbd378d452582681`; roll back by re-pointing both footers at it and republishing. This deploy shipped the `is_admin` write gate, the CSV importer's legacy `operating_hours` shape, `Open 24 Hours` parsing, the `Event` category key, and the importer Back-button fix.
+
+**Note on branches:** these commits were briefly on a topic branch (`security/admin-write-gate`) that was never pushed. It was fast-forwarded into `main` and the topic branch retired — `main` remains the only branch on GitHub, per the rule above.
 
 Each footer also contains one or two **commented-out** `@main/...?v=1` script lines left over from the old workflow. They are inert — don't mistake them for the active refs.
 
