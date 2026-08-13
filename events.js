@@ -117,7 +117,7 @@ async function getOrCreateCity(name, lat, lng) {
       const o = document.createElement('option');
       o.value = city.id;
       o.textContent = city.name;
-      s.appendChild(o);
+      s.insertBefore(o, s.querySelector('option[value="__new__"]'));
     });
 
     return city.id;

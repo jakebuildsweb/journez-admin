@@ -105,6 +105,11 @@ async function loadReferenceData() {
       o.textContent = c.name;
       sel.appendChild(o);
     });
+
+    const newOpt = document.createElement('option');
+    newOpt.value = '__new__';
+    newOpt.textContent = '+ Add new city…';
+    sel.appendChild(newOpt);
   });
 
   const catSel = gid('f-cat');
@@ -236,7 +241,7 @@ async function getOrCreateCity(name, lat, lng) {
       const o = document.createElement('option');
       o.value = city.id;
       o.textContent = city.name;
-      s.appendChild(o);
+      s.insertBefore(o, s.querySelector('option[value="__new__"]'));
     });
 
     return city.id;
