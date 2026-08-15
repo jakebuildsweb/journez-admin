@@ -12,6 +12,7 @@ const {
   signOut,
   sbFetch,
   uploadImage,
+  setAudioField,
   generateSlug,
   showToast,
   openModal,
@@ -422,7 +423,7 @@ function openAddModal() {
   gid('f-lat').value = '';
   gid('f-lng').value = '';
   gid('f-website').value = '';
-  gid('f-speechify').value = '';
+  setAudioField('');
 
   if (gid('f-new-city')) {
     gid('f-new-city').value = '';
@@ -460,7 +461,7 @@ async function openEditModal(id) {
     gid('f-lat').value = evt.latitude != null ? evt.latitude : '';
     gid('f-lng').value = evt.longitude != null ? evt.longitude : '';
     gid('f-website').value = evt.website || '';
-    gid('f-speechify').value = evt.speechify_link || '';
+    setAudioField(evt.speechify_link || '');
 
     if (gid('f-new-city')) {
       gid('f-new-city').value = '';

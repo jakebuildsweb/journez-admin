@@ -132,6 +132,73 @@
     return uploadFile(file, 'uploads', AUDIO_BUCKET, 'mp3');
   }
 
+  function ensureAudioControl() {
+    if (gid('audio-upload-row')) return;
+
+    const field = gid('f-speechify');
+    if (!field) return;
+
+    const row = document.createElement('div');
+    row.id = 'audio-upload-row';
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;';
+    row.innerHTML =
+      '<input type="file" id="audio-file-input" accept="audio/mpeg,.mp3" style="display:none">' +
+      '<button type="button" id="audio-upload-btn" class="btn btn-secondary">Upload MP3</button>' +
+      '<span id="audio-upload-status" style="font-size:13px;opacity:.7"></span>' +
+      '<audio id="audio-preview" controls preload="none" style="display:none;height:32px;flex:1;min-width:180px"></audio>';
+
+    field.insertAdjacentElement('afterend', row);
+
+    gid('audio-upload-btn').addEventListener('click', () => gid('audio-file-input').click());
+    gid('audio-file-input').addEventListener('change', e => {
+      handleAudioFile(e.target.files[0]);
+      e.target.value = '';
+    });
+    field.addEventListener('input', () => setAudioPreview(field.value.trim()));
+  }
+
+  function setAudioPreview(url) {
+    const player = gid('audio-preview');
+    if (!player) return;
+
+    if (url) {
+      player.src = url;
+      player.style.display = '';
+    } else {
+      player.removeAttribute('src');
+      player.style.display = 'none';
+    }
+  }
+
+  function setAudioField(url) {
+    ensureAudioControl();
+    gid('f-speechify').value = url || '';
+    if (gid('audio-upload-status')) gid('audio-upload-status').textContent = '';
+    setAudioPreview(url);
+  }
+
+  async function handleAudioFile(file) {
+    if (!file) return;
+
+    if (!/mpeg|mp3/i.test(file.type) && !/\.mp3$/i.test(file.name)) {
+      showToast('Audio must be an MP3', 'error');
+      return;
+    }
+
+    const status = gid('audio-upload-status');
+    status.textContent = `Uploading ${file.name}...`;
+
+    try {
+      const url = await uploadAudio(file);
+      gid('f-speechify').value = url;
+      setAudioPreview(url);
+      status.textContent = file.name;
+    } catch (e) {
+      status.textContent = '';
+      showToast('Audio upload failed: ' + e.message, 'error');
+    }
+  }
+
   function generateSlug(value) {
     return String(value || '')
       .toLowerCase()
@@ -230,6 +297,7 @@
     sbFetch,
     uploadImage,
     uploadAudio,
+    setAudioField,
     generateSlug,
     showToast,
     openModal,
