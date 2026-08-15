@@ -12,6 +12,7 @@ const {
   signOut,
   sbFetch,
   uploadImage,
+  uploadAudio,
   generateSlug,
   showToast,
   openModal,
@@ -670,7 +671,7 @@ function openAddModal() {
   gid('f-cat').value = '';
   gid('f-website').value = '';
   gid('f-phone').value = '';
-  gid('f-speechify').value = '';
+  setAudioField('');
   gid('f-focal').checked = false;
 
   resetImageState();
@@ -683,6 +684,78 @@ function setProfilePreview(url) {
   gid('profile-drop-zone').style.display = 'none';
   gid('profile-preview').style.display = '';
   gid('profile-preview').innerHTML = `<div class="img-preview"><img src="${url}" alt="Profile"><span class="img-preview-name">Current profile image</span><button class="img-preview-remove" onclick="clearProfileImage()"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>`;
+}
+
+/* ========================================
+   Audio upload (location-audio bucket)
+======================================== */
+
+function ensureAudioControl() {
+  if (gid('audio-upload-row')) return;
+
+  const field = gid('f-speechify');
+  if (!field) return;
+
+  const row = document.createElement('div');
+  row.id = 'audio-upload-row';
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;';
+  row.innerHTML =
+    '<input type="file" id="audio-file-input" accept="audio/mpeg,.mp3" style="display:none">' +
+    '<button type="button" id="audio-upload-btn" class="btn btn-secondary">Upload MP3</button>' +
+    '<span id="audio-upload-status" style="font-size:13px;opacity:.7"></span>' +
+    '<audio id="audio-preview" controls preload="none" style="display:none;height:32px;flex:1;min-width:180px"></audio>';
+
+  field.insertAdjacentElement('afterend', row);
+
+  gid('audio-upload-btn').addEventListener('click', () => gid('audio-file-input').click());
+  gid('audio-file-input').addEventListener('change', e => {
+    handleAudioFile(e.target.files[0]);
+    e.target.value = '';
+  });
+  field.addEventListener('input', () => setAudioPreview(field.value.trim()));
+}
+
+function setAudioPreview(url) {
+  const player = gid('audio-preview');
+  if (!player) return;
+
+  if (url) {
+    player.src = url;
+    player.style.display = '';
+  } else {
+    player.removeAttribute('src');
+    player.style.display = 'none';
+  }
+}
+
+function setAudioField(url) {
+  ensureAudioControl();
+  gid('f-speechify').value = url || '';
+  gid('audio-upload-status').textContent = '';
+  setAudioPreview(url);
+}
+
+async function handleAudioFile(file) {
+  if (!file) return;
+
+  const status = gid('audio-upload-status');
+
+  if (!/mpeg|mp3/i.test(file.type) && !/\.mp3$/i.test(file.name)) {
+    showToast('Audio must be an MP3', 'error');
+    return;
+  }
+
+  status.textContent = `Uploading ${file.name}...`;
+
+  try {
+    const url = await uploadAudio(file);
+    gid('f-speechify').value = url;
+    setAudioPreview(url);
+    status.textContent = file.name;
+  } catch (e) {
+    status.textContent = '';
+    showToast('Audio upload failed: ' + e.message, 'error');
+  }
 }
 
 async function openEditModal(id) {
@@ -703,7 +776,7 @@ async function openEditModal(id) {
     gid('f-cat').value = loc.category_id || '';
     gid('f-website').value = loc.website || '';
     gid('f-phone').value = loc.phone || '';
-    gid('f-speechify').value = loc.audio_file_link || '';
+    setAudioField(loc.audio_file_link || '');
     gid('f-focal').checked = !!loc.is_focal_point;
 
     resetImageState();

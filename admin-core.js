@@ -2,6 +2,7 @@
   const SUPABASE_URL = 'https://zqwilzhwiwrqgjyptfoo.supabase.co';
   const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpxd2lsemh3aXdycWdqeXB0Zm9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTk5Mzg1OTYsImV4cCI6MjAzNTUxNDU5Nn0.uWuBgX2d6PSiaveuAVBj-h6h6efHIiWIRGrsW0MH0qQ';
   const STORAGE_BUCKET = 'location-images';
+  const AUDIO_BUCKET = 'location-audio';
   const LOGIN_URL = '/admin-login';
 
   function gid(id) {
@@ -97,13 +98,13 @@
     return res.json();
   }
 
-  async function uploadImage(file, folder = 'profile') {
+  async function uploadFile(file, folder = 'profile', bucket = STORAGE_BUCKET, fallbackExt = 'bin') {
     const token = getAuthToken();
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const ext = (file.name.split('.').pop() || fallbackExt).toLowerCase();
     const filePath = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
     const res = await fetch(
-      `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${filePath}`,
+      `${SUPABASE_URL}/storage/v1/object/${bucket}/${filePath}`,
       {
         method: 'POST',
         headers: {
@@ -117,10 +118,18 @@
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`Image upload failed${errText ? `: ${errText}` : ''}`);
+      throw new Error(`Upload failed${errText ? `: ${errText}` : ''}`);
     }
 
-    return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${filePath}`;
+    return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${filePath}`;
+  }
+
+  function uploadImage(file, folder = 'profile') {
+    return uploadFile(file, folder, STORAGE_BUCKET, 'jpg');
+  }
+
+  function uploadAudio(file) {
+    return uploadFile(file, 'uploads', AUDIO_BUCKET, 'mp3');
   }
 
   function generateSlug(value) {
@@ -220,6 +229,7 @@
     signOut,
     sbFetch,
     uploadImage,
+    uploadAudio,
     generateSlug,
     showToast,
     openModal,
