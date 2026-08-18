@@ -177,6 +177,21 @@ function parseHourStr(str) {
   return `${String(h).padStart(2, '0')}:${min}`;
 }
 
+function to12Hour(t) {
+  const [h, m] = t.split(':');
+  const hr = parseInt(h, 10);
+  const ampm = hr >= 12 ? 'PM' : 'AM';
+  return `${hr % 12 || 12}:${m} ${ampm}`;
+}
+
+/* Sole writer of a stored operating_hours day. Every path that persists hours
+   goes through this so the CSV importer and the manual editor cannot drift. */
+function dayHours(open, close) {
+  if (!open || !close) return { open: 'Closed', close: 'Closed' };
+  if (open === '00:00' && close === '23:59') return { open: 'Open 24 Hours', close: '' };
+  return { open: to12Hour(open), close: to12Hour(close) };
+}
+
 function normalizeHours(raw) {
   if (!raw) return {};
   const out = {};
@@ -566,18 +581,18 @@ function setPattern(pattern) {
 
 function collectHours() {
   const hours = {};
+  let anyOpen = false;
 
   DAYS.forEach(d => {
-    if (gid('tog-' + d.id).checked) {
-      const fullDay = DAY_SHORT_TO_FULL[d.id];
-      hours[fullDay] = {
-        open: gid('open-' + d.id).value,
-        close: gid('close-' + d.id).value
-      };
-    }
+    const isOpen = gid('tog-' + d.id).checked;
+    if (isOpen) anyOpen = true;
+
+    hours[DAY_SHORT_TO_FULL[d.id]] = isOpen
+      ? dayHours(gid('open-' + d.id).value, gid('close-' + d.id).value)
+      : dayHours(null, null);
   });
 
-  return Object.keys(hours).length > 0 ? hours : null;
+  return anyOpen ? hours : null;
 }
 
 function populateHours(raw) {
@@ -738,34 +753,18 @@ function parseCSV(text) {
 
 const CSV_DAY_COLS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-function to12Hour(t) {
-  const [h, m] = t.split(':');
-  const hr = parseInt(h, 10);
-  const ampm = hr >= 12 ? 'PM' : 'AM';
-  return `${hr % 12 || 12}:${m} ${ampm}`;
-}
-
 function hoursFromCSVRow(row) {
   const hours = {};
-  const CLOSED = () => ({ open: 'Closed', close: 'Closed' });
 
   CSV_DAY_COLS.forEach(day => {
     const val = (row[`hours_${day}`] || '').trim();
-    const ALLDAY = () => ({ open: 'Open 24 Hours', close: '' });
 
-    if (!val || val.toLowerCase() === 'closed') { hours[day] = CLOSED(); return; }
-    if (/^open\s*24\s*(hours|hrs)$/i.test(val)) { hours[day] = ALLDAY(); return; }
+    if (/^open\s*24\s*(hours|hrs)$/i.test(val)) { hours[day] = dayHours('00:00', '23:59'); return; }
 
     const parts = val.split(/\s*[-–]\s*/);
-    if (parts.length !== 2) { hours[day] = CLOSED(); return; }
-
-    const open = parseHourStr(parts[0].trim());
-    const close = parseHourStr(parts[1].trim());
-    if (!open || !close) { hours[day] = CLOSED(); return; }
-
-    if (open === '00:00' && close === '23:59') { hours[day] = ALLDAY(); return; }
-
-    hours[day] = { open: to12Hour(open), close: to12Hour(close) };
+    hours[day] = parts.length === 2
+      ? dayHours(parseHourStr(parts[0].trim()), parseHourStr(parts[1].trim()))
+      : dayHours(null, null);
   });
 
   return hours;
