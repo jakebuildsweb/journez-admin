@@ -5,9 +5,28 @@
 ## Owns
 The Journez admin portal front-end: the `/admin-locations` and `/admin-events` pages' behaviour — auth/session, Supabase CRUD, the CSV importers, hours editor, image upload.
 
-- `admin-core.js` — shared: Supabase client, session/auth (`requireSession`, `signOut`), `sbFetch`, image upload, toasts, modal helpers.
+- `admin-core.js` — shared: Supabase client, session/auth (`requireSession`, `signOut`), `sbFetch`, image upload, toasts, modal helpers, and the cross-page helpers below.
 - `locations.js` — locations page: CRUD, hours editor, locations CSV import.
 - `events.js` — events page: CRUD, events CSV import (different schema from locations).
+
+### Shared contracts in `admin-core.js` (2026-08-18)
+Everything here exists because both page scripts needed it. **If you are about to write a helper in `locations.js`, check whether `events.js` has one too — if so it belongs in core.** The two pages were 34% duplicated before this pass.
+
+- **`esc(value)`** — HTML-escapes anything interpolated into `innerHTML`. Every row field, filename, and error message rendered by either page goes through it. Location and event names come from scraped CSV imports, so they are untrusted input.
+- **`safeUrl(url)`** — returns the URL only if it is `http(s)://`, else `''`. Required for any user-supplied value that reaches an `href` (the events table renders `website`); `esc` alone does not stop `javascript:`.
+- **`debounce(fn, wait)`** — both search inputs are debounced at 150ms. Un-debounced, each keystroke rebuilt 400+ rows of `innerHTML`.
+- **`countRows(table)`** — `HEAD` + `Prefer: count=exact`, reads `Content-Range`. Use it for stat cards and badges. Both pages used to fetch every row's `id` to call `.length` — that was 19.7KB per load on the events page.
+- **Cities cache** — `getCities()` / `setCities()` / `getCityName()` / `getOrCreateCity()`. Core owns the array and **mutates it in place**, so a page-level `const CITIES_DATA = getCities()` stays valid forever. Never reassign it; call `setCities()`.
+- **Profile image** — `handleProfileFile` / `setProfilePreview` / `clearProfileImage` / `getProfileImageUrl`, plus `toggleNewCity` and `switchImgTab`. Core owns the `profileImageUrl` state; read it with `getProfileImageUrl()` when building a save payload.
+
+Functions that share a *name* across the two pages but not a body — `renderTable`, `loadAndRenderTable`, `confirmImport`, `handleImportFile`, `downloadTemplate`, `loadReferenceData`, `applySortFilter`, `resetImageState`, `formatTime` — differ by schema and stay per-page **on purpose**. Do not unify them.
+
+### Table rows are cached and patched, not refetched
+Each page keeps its rows in a module-level array (`LOCATIONS` / `EVENTS`) plus a cross-entity count (`EVENT_COUNT` / `LOCATION_COUNT`). After a single save or delete, call **`applyLocalChange({ row })`** or **`applyLocalChange({ removedId })`** — it patches the cached array, re-sorts, re-renders, and refreshes the stat cards with **zero network requests**. `saveLocation`/`saveEvent` pass the row PostgREST returns (`Prefer: return=representation`, already the `sbFetch` default).
+
+`loadAndRenderTable()` is the full refetch and is now reserved for **page boot and CSV import** — import touches many rows at once, so a reload is correct there. Do not reach for it after a single-row write: on the locations page that is a 377KB round trip to change one field.
+
+Anything reading `window._allLocations` / `window._allEvents` is stale — those globals are gone.
 
 ## Out of scope
 The location dataset itself and the pipeline that produces the CSVs → `../assets/data/AGENTS.md`. Supabase schema/RLS, TTS/audio → root `CLAUDE.md`. Webflow page *markup/CSS* lives in each page's custom code in Webflow, not here.
@@ -31,17 +50,14 @@ Page IDs: `admin-locations` = `641b296798b82f3f8410de21`, `admin-events` = `69aa
 
 **Prefer pinned commit SHAs over branch refs.** A branch ref auto-deploys on every push and jsDelivr caches it for ~12h, so you get delayed, unpredictable rollouts. A pinned SHA is immutable and cached permanently — deploys happen only when you deliberately bump the ref.
 
-### Currently live (as of 2026-08-18, third deploy — PRODUCTION NOT YET PUBLISHED)
-Both page footers are now pinned to **`ff9c78a31d5ad6898b900566c5021545c914be20`** (the audio uploader), and the staging subdomain `journez-app.webflow.io` serves it. **The production domains `journez.app` / `www.journez.app` were NOT published** — the publish call was blocked by the Claude Code classifier, so production still serves `0879fe7`. Publishing from the Webflow UI completes the deploy; the footers already carry the new refs.
+### Currently live (verified against production 2026-08-18)
+Both page footers on `www.journez.app` **and** the staging subdomain are pinned to **`ff9c78a31d5ad6898b900566c5021545c914be20`** (the audio uploader). The publish that this file previously recorded as blocked did complete — confirmed by `curl https://www.journez.app/admin-locations | grep jsdelivr`. That deploy also carried `08b7e03`, the add-a-city fix.
 
-That pending publish also carries `08b7e03`, the add-a-city fix, which had been sitting unpushed.
+**Verify the live pin by curl before trusting this section.** It has been wrong once already: it claimed production still served `0879fe7` for a deploy that had actually shipped.
 
-Previous pin, still live on production:  **`0879fe7d43c332473976db73e6777ffba7902819`**:
+Undeployed on `main`: `198942f` (audio field relabel) and the optimization pass below. `main` moving does not move production — the footers still point at `ff9c78a`.
 
-- `admin-locations` → `admin-core.js` + `locations.js` at that SHA
-- `admin-events` → `admin-core.js` + `events.js` at that SHA
-
-Previous pin was `f4c07ea4458a4e5a4efbe5cfcbd378d452582681`; roll back by re-pointing both footers at it and republishing. This deploy shipped the `is_admin` write gate, the CSV importer's legacy `operating_hours` shape, `Open 24 Hours` parsing, the `Event` category key, and the importer Back-button fix.
+Previous pins, in order: `0879fe7d43c332473976db73e6777ffba7902819` (the `is_admin` write gate, the CSV importer's legacy `operating_hours` shape, `Open 24 Hours` parsing, the `Event` category key, the importer Back-button fix), and before it `f4c07ea4458a4e5a4efbe5cfcbd378d452582681`. Roll back by re-pointing both footers at one of those and republishing.
 
 **Note on branches:** these commits were briefly on a topic branch (`security/admin-write-gate`) that was never pushed. It was fast-forwarded into `main` and the topic branch retired — `main` remains the only branch on GitHub, per the rule above.
 
@@ -61,6 +77,10 @@ Write access to `locations`, `cities`, `categories`, `events` and the `location-
 `requireSession()` only checks that a `jrn_session` exists and has not expired. `requireAdmin()` additionally calls the `is_admin` RPC and redirects non-admins to `/admin-login?denied=1`; both page scripts call it first thing in their `DOMContentLoaded` handler.
 
 **That client check is UX, not security, and must never be treated as the control.** `sbFetch` sends the user's own JWT straight to PostgREST, so any signed-in user can bypass the portal entirely with curl. If you add a new admin-only table or bucket, the RLS policy is the thing that protects it — granting the front-end a new button protects nothing.
+
+Two exposed-function holes were closed 2026-08-18: `public.handle_new_user()` (the auth signup trigger) was `SECURITY DEFINER` and callable by `anon` at `/rest/v1/rpc/handle_new_user`, and `public.handle_updated_at()` ran with a mutable `search_path`. `EXECUTE` is now revoked from `anon`/`authenticated` on the former and `search_path = ''` is pinned on both. Verified afterwards that the signup trigger still mirrors into `public.users` (trigger execution does not re-check `EXECUTE`) and that the `events` updated-at trigger still fires. `is_admin()` stays executable by `authenticated` — the portal calls it.
+
+Still open, both dashboard-only: Postgres `15.8.1.085` has outstanding security patches, and leaked-password protection is off. `public.audio_link_backup` holds 88 real rows with RLS on and no policies — inaccessible rather than exposed; drop it only on the user's say-so.
 
 To add or remove an admin, insert into or delete from `public.admin_users`. It takes effect on the next query; no token refresh and no redeploy. Do not reach for a JWT/`app_metadata` claim instead — that was considered and rejected (`../docs/DECISIONS.md`, 2026-08-05) because revocation then waits on token expiry.
 

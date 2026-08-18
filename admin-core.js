@@ -69,18 +69,24 @@
     return false;
   }
 
-  async function sbFetch(path, opts = {}) {
+  function authHeaders(extra = {}) {
     const token = getAuthToken();
 
+    return {
+      apikey: SUPABASE_ANON,
+      Authorization: `Bearer ${token || SUPABASE_ANON}`,
+      ...extra,
+    };
+  }
+
+  async function sbFetch(path, opts = {}) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
       ...opts,
-      headers: {
-        apikey: SUPABASE_ANON,
-        Authorization: `Bearer ${token || SUPABASE_ANON}`,
+      headers: authHeaders({
         'Content-Type': 'application/json',
         Prefer: opts.prefer || 'return=representation',
         ...opts.headers,
-      },
+      }),
     });
 
     if (!res.ok) {
@@ -98,8 +104,16 @@
     return res.json();
   }
 
+  async function countRows(table) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
+      method: 'HEAD',
+      headers: authHeaders({ Prefer: 'count=exact' }),
+    });
+
+    return Number((res.headers.get('content-range') || '').split('/')[1]) || 0;
+  }
+
   async function uploadFile(file, folder = 'profile', bucket = STORAGE_BUCKET, fallbackExt = 'bin') {
-    const token = getAuthToken();
     const ext = (file.name.split('.').pop() || fallbackExt).toLowerCase();
     const filePath = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
@@ -107,11 +121,7 @@
       `${SUPABASE_URL}/storage/v1/object/${bucket}/${filePath}`,
       {
         method: 'POST',
-        headers: {
-          apikey: SUPABASE_ANON,
-          Authorization: `Bearer ${token || SUPABASE_ANON}`,
-          'Content-Type': file.type || 'application/octet-stream',
-        },
+        headers: authHeaders({ 'Content-Type': file.type || 'application/octet-stream' }),
         body: file,
       }
     );
@@ -289,9 +299,164 @@
     return lastActionTime;
   }
 
+  const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+  }
+
+  /* Blocks javascript:/data: URLs from reaching an href we render */
+  function safeUrl(url) {
+    const u = String(url ?? '').trim();
+    return /^https?:\/\//i.test(u) ? u : '';
+  }
+
+  function debounce(fn, wait = 150) {
+    let timer;
+
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), wait);
+    };
+  }
+
+  const CITIES = [];
+
+  function getCities() {
+    return CITIES;
+  }
+
+  function setCities(list) {
+    CITIES.length = 0;
+    (list || []).forEach(c => CITIES.push(c));
+    return CITIES;
+  }
+
+  function getCityName(cityId) {
+    const c = CITIES.find(c => c.id === cityId);
+    return c ? c.name : '—';
+  }
+
+  async function getOrCreateCity(name, lat, lng) {
+    if (!name || name === '__new__') return null;
+
+    const ex = CITIES.find(c => c.name.toLowerCase() === name.toLowerCase());
+    if (ex) return ex.id;
+
+    const res = await sbFetch('cities', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: name.trim(),
+        slug: generateSlug(name),
+        latitude: lat || 0,
+        longitude: lng || 0
+      })
+    });
+
+    const city = Array.isArray(res) ? res[0] : res;
+
+    if (city?.id) {
+      CITIES.push(city);
+
+      ['f-city', 'city-select'].forEach(id => {
+        const s = gid(id);
+        if (!s) return;
+
+        const o = document.createElement('option');
+        o.value = city.id;
+        o.textContent = city.name;
+        s.insertBefore(o, s.querySelector('option[value="__new__"]'));
+      });
+
+      return city.id;
+    }
+
+    return null;
+  }
+
+  function toggleNewCity(sel) {
+    const n = gid('f-new-city');
+    if (!n) return;
+
+    if (sel.value === '__new__') {
+      n.style.display = '';
+      n.focus();
+    } else {
+      n.style.display = 'none';
+      n.value = '';
+    }
+  }
+
+  function switchImgTab(field, mode, btn) {
+    const tabs = btn.closest('.img-tabs').querySelectorAll('.img-tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+
+    gid(`${field}-upload-panel`).style.display = mode === 'upload' ? '' : 'none';
+    gid(`${field}-url-panel`).style.display = mode === 'url' ? '' : 'none';
+  }
+
+  let profileImageUrl = null;
+
+  const REMOVE_BTN = '<button class="img-preview-remove" onclick="clearProfileImage()"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12"/></svg></button>';
+
+  function getProfileImageUrl() {
+    return profileImageUrl;
+  }
+
+  function setProfilePreview(url) {
+    profileImageUrl = url;
+    gid('profile-drop-zone').style.display = 'none';
+    gid('profile-preview').style.display = '';
+    gid('profile-preview').innerHTML = `<div class="img-preview"><img src="${esc(url)}" alt="Profile"><span class="img-preview-name">Current profile image</span>${REMOVE_BTN}</div>`;
+  }
+
+  function clearProfileImage() {
+    profileImageUrl = null;
+    gid('profile-preview').style.display = 'none';
+    gid('profile-preview').innerHTML = '';
+    gid('profile-drop-zone').style.display = '';
+    gid('profile-file-input').value = '';
+  }
+
+  async function handleProfileFile(file) {
+    if (!file) return;
+
+    const preview = gid('profile-preview');
+    const dropZone = gid('profile-drop-zone');
+
+    preview.innerHTML = `<div class="img-uploading"><div class="loading-spinner"></div>Uploading...</div>`;
+    preview.style.display = '';
+    dropZone.style.display = 'none';
+
+    try {
+      profileImageUrl = await uploadImage(file, 'profile');
+      preview.innerHTML = `<div class="img-preview"><img src="${esc(profileImageUrl)}" alt="Profile"><span class="img-preview-name">${esc(file.name)}</span>${REMOVE_BTN}</div>`;
+    } catch (e) {
+      showToast('Image upload failed: ' + e.message, 'error');
+      preview.style.display = 'none';
+      dropZone.style.display = '';
+      profileImageUrl = null;
+    }
+  }
+
   window.JournezAdminCore = {
     gid,
     qsa,
+    esc,
+    safeUrl,
+    debounce,
+    countRows,
+    getCities,
+    setCities,
+    getCityName,
+    getOrCreateCity,
+    toggleNewCity,
+    switchImgTab,
+    getProfileImageUrl,
+    setProfilePreview,
+    clearProfileImage,
+    handleProfileFile,
     getSession,
     clearSession,
     getAuthToken,

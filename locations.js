@@ -7,6 +7,9 @@ const SVG_CHECK = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><p
 const {
   gid,
   qsa,
+  esc,
+  debounce,
+  countRows,
   requireSession,
   requireAdmin,
   signOut,
@@ -19,7 +22,17 @@ const {
   closeModal,
   updateBadges,
   updateLastUpdated,
-  getLastActionTime
+  getLastActionTime,
+  getCities,
+  setCities,
+  getCityName,
+  getOrCreateCity,
+  toggleNewCity,
+  switchImgTab,
+  getProfileImageUrl,
+  setProfilePreview,
+  clearProfileImage,
+  handleProfileFile
 } = window.JournezAdminCore;
 
 /* Require an active admin session before anything else runs */
@@ -29,9 +42,10 @@ requireSession();
    Page state
 ======================================== */
 
-let CITIES_DATA = [];          // cached cities for selects / filters
+const CITIES_DATA = getCities();  // shared cities cache, owned by admin-core
 let CATEGORIES_DATA = [];      // cached categories for form + table display
-let profileImageUrl = null;    // profile image URL for current form
+let LOCATIONS = [];            // cached table rows, patched in place on save / delete
+let EVENT_COUNT = 0;           // events total, for the sidebar badge
 let galleryImageUrls = [];     // gallery images for current form
 let editingId = null;          // current location being edited
 let _sortKey = 'name';         // current table sort key
@@ -88,7 +102,7 @@ async function loadReferenceData() {
     sbFetch('categories?select=id,name&order=name')
   ]);
 
-  CITIES_DATA = cities || [];
+  setCities(cities);
   CATEGORIES_DATA = cats || [];
 
   const citySelects = ['f-city'];
@@ -204,52 +218,12 @@ function formatTime(t) {
    Lookup helpers
 ======================================== */
 
-function getCityName(cityId) {
-  const c = CITIES_DATA.find(c => c.id === cityId);
-  return c ? c.name : '—';
-}
 
 function getCatName(catId) {
   const c = CATEGORIES_DATA.find(c => c.id === catId);
   return c ? c.name : null;
 }
 
-async function getOrCreateCity(name, lat, lng) {
-  if (!name || name === '__new__') return null;
-
-  const ex = CITIES_DATA.find(c => c.name.toLowerCase() === name.toLowerCase());
-  if (ex) return ex.id;
-
-  const res = await sbFetch('cities', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: name.trim(),
-      slug: generateSlug(name),
-      latitude: lat || 0,
-      longitude: lng || 0
-    })
-  });
-
-  const city = Array.isArray(res) ? res[0] : res;
-
-  if (city?.id) {
-    CITIES_DATA.push(city);
-
-    ['f-city', 'city-select'].forEach(id => {
-      const s = gid(id);
-      if (!s) return;
-
-      const o = document.createElement('option');
-      o.value = city.id;
-      o.textContent = city.name;
-      s.insertBefore(o, s.querySelector('option[value="__new__"]'));
-    });
-
-    return city.id;
-  }
-
-  return null;
-}
 
 /* ========================================
    Main table loader
@@ -262,43 +236,67 @@ async function loadAndRenderTable() {
   tbody.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>';
 
   try {
-    const [locations, eventData] = await Promise.all([
+    const [locations, eventCount] = await Promise.all([
       sbFetch('locations?select=id,name,address,latitude,longitude,city_id,category_id,profile_image,audio_file_link,is_focal_point,operating_hours,slug,updated_at&order=name'),
-      sbFetch('events?select=id')
+      countRows('events')
     ]);
 
-    const locs = locations || [];
-    const locCount = locs.length;
-    const evtCount = (eventData || []).length;
-    const cityCount = [...new Set(locs.map(l => l.city_id).filter(Boolean))].length;
+    LOCATIONS = locations || [];
+    EVENT_COUNT = eventCount;
 
-    renderTable(locs);
-
-    const _st = gid('stat-total');
-    if (_st) {
-      _st.textContent = locCount;
-      const _ss = _st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
-      if (_ss) _ss.textContent = `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`;
-    }
-
-    const _sc = gid('stat-cities');
-    if (_sc) {
-      _sc.textContent = cityCount;
-      const _scs = _sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
-      if (_scs) _scs.textContent = 'Active in app';
-    }
-
-    updateBadges(locCount, evtCount);
-
-    const effective = [
-      locs.map(l => l.updated_at).filter(Boolean).sort().reverse()[0],
-      getLastActionTime()
-    ].filter(Boolean).sort().reverse()[0];
-
-    if (effective) updateLastUpdated(effective);
+    renderTable(LOCATIONS);
+    renderStats();
   } catch (e) {
-    tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg><div class="empty-title">Failed to load</div><div class="empty-sub">${e.message}</div></div>`;
+    tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg><div class="empty-title">Failed to load</div><div class="empty-sub">${esc(e.message)}</div></div>`;
   }
+}
+
+function renderStats() {
+  const locCount = LOCATIONS.length;
+  const cityCount = [...new Set(LOCATIONS.map(l => l.city_id).filter(Boolean))].length;
+
+  const _st = gid('stat-total');
+  if (_st) {
+    _st.textContent = locCount;
+    const _ss = _st.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
+    if (_ss) _ss.textContent = `Across ${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`;
+  }
+
+  const _sc = gid('stat-cities');
+  if (_sc) {
+    _sc.textContent = cityCount;
+    const _scs = _sc.closest('[class*="card_component"]')?.querySelector('[class*="card_sub"]');
+    if (_scs) _scs.textContent = 'Active in app';
+  }
+
+  updateBadges(locCount, EVENT_COUNT);
+
+  const effective = [
+    LOCATIONS.map(l => l.updated_at).filter(Boolean).sort().reverse()[0],
+    getLastActionTime()
+  ].filter(Boolean).sort().reverse()[0];
+
+  if (effective) updateLastUpdated(effective);
+}
+
+/* Apply a single save or delete to the cached rows instead of refetching the table */
+function applyLocalChange({ row, removedId }) {
+  if (removedId) {
+    LOCATIONS = LOCATIONS.filter(l => l.id !== removedId);
+  } else if (row?.id) {
+    const i = LOCATIONS.findIndex(l => l.id === row.id);
+
+    if (i === -1) LOCATIONS.push(row);
+    else LOCATIONS[i] = { ...LOCATIONS[i], ...row };
+
+    LOCATIONS.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } else {
+    loadAndRenderTable();
+    return;
+  }
+
+  renderTable(LOCATIONS);
+  renderStats();
 }
 
 /* ========================================
@@ -320,7 +318,7 @@ function renderTable(locations) {
     const cc = CAT_COLORS[catName] || { bg: 'var(--gray-100)', color: 'var(--gray-600)' };
 
     const catTag = catName
-      ? `<span class="city-tag" style="background:${cc.bg};color:${cc.color};border-color:transparent">${catName}</span>`
+      ? `<span class="city-tag" style="background:${cc.bg};color:${cc.color};border-color:transparent">${esc(catName)}</span>`
       : `<span style="font-size:12px;color:var(--gray-300);font-style:italic">—</span>`;
 
     const hours = normalizeHours(l.operating_hours);
@@ -346,10 +344,8 @@ function renderTable(locations) {
       ? `<span style="width:7px;height:7px;border-radius:50%;background:#2563eb;display:inline-block;flex-shrink:0;margin-top:1px"></span>`
       : '';
 
-    return `<div class="table-row" onclick="openEditModal('${l.id}')"><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${l.name}</div>${focalDot}${audioIcon}</div><div class="loc-addr">${l.address || '—'}</div></div><div><span class="city-tag">${cityName}</span></div><div>${catTag}</div><div>${hoursHtml}</div><div class="row-actions"><button class="icon-btn" onclick="event.stopPropagation();openEditModal('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteLocation('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
+    return `<div class="table-row" onclick="openEditModal('${l.id}')"><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${esc(l.name)}</div>${focalDot}${audioIcon}</div><div class="loc-addr">${esc(l.address || '—')}</div></div><div><span class="city-tag">${esc(cityName)}</span></div><div>${catTag}</div><div>${hoursHtml}</div><div class="row-actions"><button class="icon-btn" onclick="event.stopPropagation();openEditModal('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteLocation('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
   }).join('');
-
-  window._allLocations = locations;
 }
 
 /* ========================================
@@ -401,9 +397,7 @@ function applySortFilter(locs) {
   return filtered;
 }
 
-function filterTable() {
-  if (window._allLocations) renderTable(window._allLocations);
-}
+const filterTable = debounce(() => renderTable(LOCATIONS), 150);
 
 /* ========================================
    Delete location
@@ -420,7 +414,7 @@ async function deleteLocation(id) {
 
     showToast('Location deleted.');
     updateLastUpdated(new Date().toISOString());
-    loadAndRenderTable();
+    applyLocalChange({ removedId: id });
   } catch (e) {
     showToast('Delete failed: ' + e.message, 'error');
   }
@@ -430,43 +424,8 @@ async function deleteLocation(id) {
    Image handling
 ======================================== */
 
-function switchImgTab(field, mode, btn) {
-  const tabs = btn.closest('.img-tabs').querySelectorAll('.img-tab');
-  tabs.forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
 
-  gid(`${field}-upload-panel`).style.display = mode === 'upload' ? '' : 'none';
-  gid(`${field}-url-panel`).style.display = mode === 'url' ? '' : 'none';
-}
 
-async function handleProfileFile(file) {
-  if (!file) return;
-
-  const preview = gid('profile-preview');
-  const dropZone = gid('profile-drop-zone');
-
-  preview.innerHTML = `<div class="img-uploading"><div class="loading-spinner"></div>Uploading...</div>`;
-  preview.style.display = '';
-  dropZone.style.display = 'none';
-
-  try {
-    profileImageUrl = await uploadImage(file, 'profile');
-    preview.innerHTML = `<div class="img-preview"><img src="${profileImageUrl}" alt="Profile"><span class="img-preview-name">${file.name}</span><button class="img-preview-remove" onclick="clearProfileImage()"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>`;
-  } catch (e) {
-    showToast('Image upload failed: ' + e.message, 'error');
-    preview.style.display = 'none';
-    dropZone.style.display = '';
-    profileImageUrl = null;
-  }
-}
-
-function clearProfileImage() {
-  profileImageUrl = null;
-  gid('profile-preview').style.display = 'none';
-  gid('profile-preview').innerHTML = '';
-  gid('profile-drop-zone').style.display = '';
-  gid('profile-file-input').value = '';
-}
 
 async function handleGalleryFiles(files) {
   for (const file of files) {
@@ -490,7 +449,7 @@ function addGalleryItem(url, label) {
 
   item.className = 'gallery-item';
   item.dataset.url = url;
-  item.innerHTML = `<img src="${url}" alt="${label || ''}"><button class="gallery-item-remove" onclick="removeGalleryItem(this,'${url}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
+  item.innerHTML = `<img src="${esc(url)}" alt="${esc(label || '')}"><button class="gallery-item-remove" onclick="removeGalleryItem(this,'${esc(url)}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12"/></svg></button>`;
 
   grid.insertBefore(item, addBtn);
 }
@@ -501,7 +460,6 @@ function removeGalleryItem(btn, url) {
 }
 
 function resetImageState() {
-  profileImageUrl = null;
   galleryImageUrls = [];
   clearProfileImage();
 
@@ -634,18 +592,6 @@ function populateHours(raw) {
    Form helpers
 ======================================== */
 
-function toggleNewCity(sel) {
-  const n = gid('f-new-city');
-  if (!n) return;
-
-  if (sel.value === '__new__') {
-    n.style.display = '';
-    n.focus();
-  } else {
-    n.style.display = 'none';
-    n.value = '';
-  }
-}
 
 /* ========================================
    Location modal
@@ -679,12 +625,6 @@ function openAddModal() {
   openModal('modal-location');
 }
 
-function setProfilePreview(url) {
-  profileImageUrl = url;
-  gid('profile-drop-zone').style.display = 'none';
-  gid('profile-preview').style.display = '';
-  gid('profile-preview').innerHTML = `<div class="img-preview"><img src="${url}" alt="Profile"><span class="img-preview-name">Current profile image</span><button class="img-preview-remove" onclick="clearProfileImage()"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>`;
-}
 
 async function openEditModal(id) {
   try {
@@ -893,7 +833,7 @@ function showImportPreview(rows, filename) {
   const skipCount = rows.filter(r => r.status === 'skip').length;
   const errorCount = rows.filter(r => r.status === 'error').length;
 
-  const summaryHtml = `<div class="import-preview-summary"><div style="font-size:13px;font-weight:600;color:var(--gray-800);flex:1">${filename}</div><span class="import-badge add">+${addCount} to add</span>${skipCount ? `<span class="import-badge skip">${skipCount} skipped</span>` : ''}${errorCount ? `<span class="import-badge error">${errorCount} errors</span>` : ''}</div>`;
+  const summaryHtml = `<div class="import-preview-summary"><div style="font-size:13px;font-weight:600;color:var(--gray-800);flex:1">${esc(filename)}</div><span class="import-badge add">+${addCount} to add</span>${skipCount ? `<span class="import-badge skip">${skipCount} skipped</span>` : ''}${errorCount ? `<span class="import-badge error">${errorCount} errors</span>` : ''}</div>`;
   const headerHtml = `<div class="import-preview-row header"><div>#</div><div>Name</div><div>City</div><div>Status</div></div>`;
 
   const rowsHtml = rows.map(r => {
@@ -904,10 +844,10 @@ function showImportPreview(rows, filename) {
       : `<span class="import-status-pill error">Error</span>`;
 
     const errorHint = r.errors?.length
-      ? `<div class="import-error-hint">${r.errors.join(', ')}</div>`
+      ? `<div class="import-error-hint">${esc(r.errors.join(', '))}</div>`
       : '';
 
-    return `<div class="import-preview-row will-${r.status}"><div class="import-row-num">${r.rowNum}</div><div><div class="import-row-name">${r.name || '—'}</div>${errorHint}</div><div class="import-row-city">${r.cityName || '—'}</div><div class="import-row-status">${statusPill}</div></div>`;
+    return `<div class="import-preview-row will-${r.status}"><div class="import-row-num">${r.rowNum}</div><div><div class="import-row-name">${esc(r.name || '—')}</div>${errorHint}</div><div class="import-row-city">${esc(r.cityName || '—')}</div><div class="import-row-status">${statusPill}</div></div>`;
   }).join('');
 
   gid('import-preview-content').innerHTML = summaryHtml + `<div class="import-preview-table">${headerHtml}${rowsHtml}</div>`;
@@ -1054,7 +994,7 @@ async function saveLocation() {
 
   const resolvedCityId = newCityInput ? await getOrCreateCity(newCityInput, lat, lng) : cityVal;
 
-  let finalProfileUrl = profileImageUrl;
+  let finalProfileUrl = getProfileImageUrl();
   const profileUrlInput = gid('f-profile-url').value.trim();
   if (!finalProfileUrl && profileUrlInput) finalProfileUrl = profileUrlInput;
 
@@ -1087,8 +1027,10 @@ async function saveLocation() {
   btn.textContent = 'Saving…';
 
   try {
+    let saved;
+
     if (editingId) {
-      await sbFetch(`locations?id=eq.${editingId}`, {
+      saved = await sbFetch(`locations?id=eq.${editingId}`, {
         method: 'PATCH',
         body: JSON.stringify(payload)
       });
@@ -1096,7 +1038,7 @@ async function saveLocation() {
       updateLastUpdated(new Date().toISOString());
     } else {
       payload.created_at = new Date().toISOString();
-      await sbFetch('locations', {
+      saved = await sbFetch('locations', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
@@ -1105,7 +1047,7 @@ async function saveLocation() {
     }
 
     closeModal('modal-location');
-    loadAndRenderTable();
+    applyLocalChange({ row: Array.isArray(saved) ? saved[0] : saved });
   } catch (e) {
     showToast('Save failed: ' + e.message, 'error');
   } finally {
