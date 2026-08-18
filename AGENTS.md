@@ -31,8 +31,12 @@ Page IDs: `admin-locations` = `641b296798b82f3f8410de21`, `admin-events` = `69aa
 
 **Prefer pinned commit SHAs over branch refs.** A branch ref auto-deploys on every push and jsDelivr caches it for ~12h, so you get delayed, unpredictable rollouts. A pinned SHA is immutable and cached permanently — deploys happen only when you deliberately bump the ref.
 
-### Currently live (as of 2026-08-05, second deploy)
-Both pages are pinned to commit **`0879fe7d43c332473976db73e6777ffba7902819`**:
+### Currently live (as of 2026-08-18, third deploy — PRODUCTION NOT YET PUBLISHED)
+Both page footers are now pinned to **`ff9c78a31d5ad6898b900566c5021545c914be20`** (the audio uploader), and the staging subdomain `journez-app.webflow.io` serves it. **The production domains `journez.app` / `www.journez.app` were NOT published** — the publish call was blocked by the Claude Code classifier, so production still serves `0879fe7`. Publishing from the Webflow UI completes the deploy; the footers already carry the new refs.
+
+That pending publish also carries `08b7e03`, the add-a-city fix, which had been sitting unpushed.
+
+Previous pin, still live on production:  **`0879fe7d43c332473976db73e6777ffba7902819`**:
 
 - `admin-locations` → `admin-core.js` + `locations.js` at that SHA
 - `admin-events` → `admin-core.js` + `events.js` at that SHA
@@ -52,7 +56,7 @@ The footer block is ~8–10KB of modal HTML with the script tags as the last two
 4. `set_page_freeform_code`, publish, then verify the live HTML with `curl | grep jsdelivr`.
 
 ## Auth — the database is the enforcement point
-Write access to `locations`, `cities`, `categories`, `events` and the `location-images` bucket is gated by RLS policies that call `public.is_admin()`, which checks membership in `public.admin_users`. Seeded 2026-08-05 with `admin@journez.app`. Migration and verification notes: `../docs/MIGRATION-admin-rls.sql`.
+Write access to `locations`, `cities`, `categories`, `events` and the `location-images` and `location-audio` buckets is gated by RLS policies that call `public.is_admin()`, which checks membership in `public.admin_users`. Seeded 2026-08-05 with `admin@journez.app`. Migration and verification notes: `../docs/MIGRATION-admin-rls.sql`.
 
 `requireSession()` only checks that a `jrn_session` exists and has not expired. `requireAdmin()` additionally calls the `is_admin` RPC and redirects non-admins to `/admin-login?denied=1`; both page scripts call it first thing in their `DOMContentLoaded` handler.
 
