@@ -50,14 +50,24 @@ Page IDs: `admin-locations` = `641b296798b82f3f8410de21`, `admin-events` = `69aa
 
 **Prefer pinned commit SHAs over branch refs.** A branch ref auto-deploys on every push and jsDelivr caches it for ~12h, so you get delayed, unpredictable rollouts. A pinned SHA is immutable and cached permanently — deploys happen only when you deliberately bump the ref.
 
-### Currently live (verified against production 2026-08-18)
-Both page footers on `www.journez.app` **and** the staging subdomain are pinned to **`ff9c78a31d5ad6898b900566c5021545c914be20`** (the audio uploader). The publish that this file previously recorded as blocked did complete — confirmed by `curl https://www.journez.app/admin-locations | grep jsdelivr`. That deploy also carried `08b7e03`, the add-a-city fix.
+### Currently live (verified by curl 2026-08-18)
 
-**Verify the live pin by curl before trusting this section.** It has been wrong once already: it claimed production still served `0879fe7` for a deploy that had actually shipped.
+| Target | Serving |
+| --- | --- |
+| `www.journez.app` / `journez.app` | **`ff9c78a31d5ad6898b900566c5021545c914be20`** (audio uploader) |
+| `journez-app.webflow.io` (staging) | **`b94791a375bce8887e8f18717c7304f53737d092`** (optimization pass) |
 
-Undeployed on `main`: `198942f` (audio field relabel) and the optimization pass below. `main` moving does not move production — the footers still point at `ff9c78a`.
+Both page footers now carry `b94791a`. Publishing to the production domains from the Webflow UI is all that remains — it ships the optimization pass plus `198942f` (audio field relabel).
+
+**Verify the live pin by curl before trusting this section, and check staging and production separately.** Two mistakes are on record here: it once claimed a completed publish had been blocked, and the footers can sit saved-but-unpublished at a SHA neither domain is serving (they were at `198942f` while both domains served `ff9c78a`). The saved footer ref, the staging ref, and the production ref are three different things.
+
+```bash
+for h in https://journez-app.webflow.io https://www.journez.app; do echo "$h"; curl -s -L "$h/admin-locations" | grep -o 'journez-admin@[0-9a-f]\{40\}'; done
+```
 
 Previous pins, in order: `0879fe7d43c332473976db73e6777ffba7902819` (the `is_admin` write gate, the CSV importer's legacy `operating_hours` shape, `Open 24 Hours` parsing, the `Event` category key, the importer Back-button fix), and before it `f4c07ea4458a4e5a4efbe5cfcbd378d452582681`. Roll back by re-pointing both footers at one of those and republishing.
+
+**The footer-swap procedure below works — it was used for this deploy and the result was byte-identical to the intended file.** The reliable trick: don't retype the footer. `curl` the published page, slice from `<div class="toast-wrap"` to `</body>`, string-replace the old SHA, diff to prove only the two script lines changed, then write that back.
 
 **Note on branches:** these commits were briefly on a topic branch (`security/admin-write-gate`) that was never pushed. It was fast-forwarded into `main` and the topic branch retired — `main` remains the only branch on GitHub, per the rule above.
 
