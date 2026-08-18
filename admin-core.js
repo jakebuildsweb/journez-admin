@@ -138,6 +138,11 @@
     const field = gid('f-speechify');
     if (!field) return;
 
+    const label = field.parentElement.querySelector('label');
+    if (label) label.textContent = 'Narration audio';
+    const hint = field.parentElement.querySelector('.field-hint');
+    if (hint) hint.textContent = 'Upload an MP3, or paste a URL.';
+
     const row = document.createElement('div');
     row.id = 'audio-upload-row';
     row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;';
