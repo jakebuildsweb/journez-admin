@@ -97,6 +97,7 @@ To add or remove an admin, insert into or delete from `public.admin_users`. It t
 ## Invariants (never violate)
 - **Never commit secrets.** `admin-core.js` contains the Supabase URL and the **anon** key — public by design, RLS enforces access. Any service-role key, or any third-party API key (e.g. Speechify), must never land here — those go through a Supabase Edge Function. Mirrors the root `CLAUDE.md` hard rule.
 - **Never delete a branch or commit that a live `<script src>` still points at.** jsDelivr resolves refs at request time; the page 404s the moment the ref disappears.
+- **`dayHours()` (`locations.js:180`) is the only function allowed to build a stored `operating_hours` day.** Both writers — `collectHours()` (manual editor) and `hoursFromCSVRow()` (importer) — go through it, and a new write path must too. They diverged silently for two weeks and damaged 268 live rows; see the 2026-08-18 entry in `../docs/DECISIONS.md`. `node hours-check.js locations.js` asserts the round-trip.
 - CSV importer behaviour is contract, not implementation detail — `../assets/data/AGENTS.md` documents the exact contract the 13 shipped CSVs rely on. Changing validation, city/category matching, or hours parsing can silently break a 271-row import.
 
 ## Confuses new engineers
