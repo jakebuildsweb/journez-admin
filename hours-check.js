@@ -38,7 +38,7 @@ function collectHours(state) {
 const saved = collectHours({ mon: ['09:00','17:00'], sun: ['00:00','23:59'] });
 assert.deepStrictEqual(saved.monday, { open: '9:00 AM', close: '5:00 PM' });
 assert.deepStrictEqual(saved.saturday, { open: 'Closed', close: 'Closed' });
-assert.deepStrictEqual(saved.sunday, { open: 'Open 24 Hours', close: '' });
+assert.deepStrictEqual(saved.sunday, { open: '12:00 AM', close: '11:59 PM' });
 assert.strictEqual(Object.keys(saved).length, 7);
 
 // 2. the reported live regression: CSV import -> edit modal -> save unchanged must round-trip

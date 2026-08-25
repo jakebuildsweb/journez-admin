@@ -188,7 +188,6 @@ function to12Hour(t) {
    goes through this so the CSV importer and the manual editor cannot drift. */
 function dayHours(open, close) {
   if (!open || !close) return { open: 'Closed', close: 'Closed' };
-  if (open === '00:00' && close === '23:59') return { open: 'Open 24 Hours', close: '' };
   return { open: to12Hour(open), close: to12Hour(close) };
 }
 
