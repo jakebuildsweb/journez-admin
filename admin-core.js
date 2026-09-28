@@ -3,6 +3,7 @@
   const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpxd2lsemh3aXdycWdqeXB0Zm9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTk5Mzg1OTYsImV4cCI6MjAzNTUxNDU5Nn0.uWuBgX2d6PSiaveuAVBj-h6h6efHIiWIRGrsW0MH0qQ';
   const STORAGE_BUCKET = 'location-images';
   const AUDIO_BUCKET = 'location-audio';
+  const STUDIO_VOICES_URL = 'https://studio.speechify.com/voices';
   const LOGIN_URL = '/admin-login';
 
   function gid(id) {
@@ -163,6 +164,29 @@
       '<audio id="audio-preview" controls preload="none" style="display:none;height:32px;flex:1;min-width:180px"></audio>';
 
     field.insertAdjacentElement('afterend', row);
+
+    const studio = document.createElement('div');
+    studio.id = 'audio-studio-row';
+    studio.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;';
+    studio.innerHTML =
+      '<button type="button" id="audio-copy-btn" class="btn btn-secondary">Copy description</button>' +
+      `<a href="${STUDIO_VOICES_URL}" target="_blank" rel="noopener" class="btn btn-secondary">Open Speechify</a>` +
+      '<span style="font-size:13px;opacity:.7;flex-basis:100%">To make narration: copy the description, open Speechify, click Use Voice on Default Journez Voice (M), paste, click Download, then upload the MP3 here.</span>';
+    row.insertAdjacentElement('afterend', studio);
+
+    gid('audio-copy-btn').addEventListener('click', async () => {
+      const text = (gid('f-desc')?.value || '').trim();
+      if (!text) {
+        showToast('Add a description first', 'error');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Description copied');
+      } catch (e) {
+        showToast('Could not copy. Select the description and copy it by hand.', 'error');
+      }
+    });
 
     gid('audio-upload-btn').addEventListener('click', () => gid('audio-file-input').click());
     gid('audio-file-input').addEventListener('change', e => {
