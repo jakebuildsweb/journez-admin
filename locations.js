@@ -48,8 +48,8 @@ let LOCATIONS = [];            // cached table rows, patched in place on save / 
 let EVENT_COUNT = 0;           // events total, for the sidebar badge
 let galleryImageUrls = [];     // gallery images for current form
 let editingId = null;          // current location being edited
-let _sortKey = 'name';         // current table sort key
-let _sortDir = 'asc';          // current table sort direction
+let _sortKey = 'updated';      // current table sort key
+let _sortDir = 'desc';         // current table sort direction
 
 /* ========================================
    Day / hours helpers
@@ -365,7 +365,7 @@ function renderTable(locations) {
       : '';
     const hideBtn = `<button class="icon-btn" title="${l.hidden_at ? 'Show in app' : 'Hide from app'}" onclick="event.stopPropagation();toggleHidden('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor">${l.hidden_at ? '<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.5 12C3.8 7.9 7.6 5 12 5s8.2 2.9 9.5 7c-1.3 4.1-5.1 7-9.5 7s-8.2-2.9-9.5-7z"/>' : '<path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.1A9.8 9.8 0 0112 5c4.4 0 8.2 2.9 9.5 7a10 10 0 01-2.2 3.6M6.6 6.6A10 10 0 002.5 12c1.3 4.1 5.1 7 9.5 7 1.6 0 3.2-.4 4.6-1.1"/>'}</svg></button>`;
 
-    return `<div class="table-row" onclick="openEditModal('${l.id}')"${l.hidden_at ? ' style="opacity:.5"' : ''}><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${esc(l.name)}</div>${focalDot}${audioIcon}${hiddenTag}</div><div class="loc-addr">${esc(l.address || '—')}</div></div><div><span class="city-tag">${esc(cityName)}</span></div><div>${catTag}</div><div>${hoursHtml}</div><div class="row-actions">${hideBtn}<button class="icon-btn" onclick="event.stopPropagation();openEditModal('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteLocation('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
+    return `<div class="table-row" onclick="openEditModal('${l.id}')"${l.hidden_at ? ' style="opacity:.5"' : ''}><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${esc(l.name)}</div>${focalDot}${audioIcon}${hiddenTag}</div><div class="loc-addr">${esc(l.address || '—')}</div><div class="loc-addr" style="font-size:11px;opacity:.7">${l.updated_at ? 'Modified ' + formatModified(l.updated_at) : ''}</div></div><div><span class="city-tag">${esc(cityName)}</span></div><div>${catTag}</div><div>${hoursHtml}</div><div class="row-actions">${hideBtn}<button class="icon-btn" onclick="event.stopPropagation();openEditModal('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteLocation('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
   }).join('');
 }
 
@@ -373,9 +373,53 @@ function renderTable(locations) {
    Table sorting / filtering
 ======================================== */
 
-function onSortChange(v) {
-  [_sortKey, _sortDir] = v.split('-');
-  filterTable();
+const SORT_DEFAULT_DIR = { name: 'asc', city: 'asc', category: 'asc', updated: 'desc' };
+const SORT_HEADERS = { location: 'name', city: 'city', category: 'category' };
+
+function setSort(key) {
+  if (key === _sortKey) _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
+  else [_sortKey, _sortDir] = [key, SORT_DEFAULT_DIR[key]];
+
+  const sel = gid('sort-select');
+  if (sel) sel.value = _sortKey;
+  updateSortHeaders();
+  renderTable(LOCATIONS);
+}
+
+function onSortChange(key) {
+  _sortKey = '';
+  setSort(key);
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll('.table_header-text').forEach(h => {
+    const key = SORT_HEADERS[h.dataset.label];
+    if (!key) return;
+    h.textContent = h.dataset.text + (key === _sortKey ? (_sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+  });
+}
+
+function initSortHeaders() {
+  document.querySelectorAll('.table_header-text').forEach(h => {
+    const label = h.textContent.trim().toLowerCase();
+    if (!SORT_HEADERS[label]) return;
+    h.dataset.label = label;
+    h.dataset.text = h.textContent.trim();
+    h.style.cursor = 'pointer';
+    h.style.userSelect = 'none';
+    h.addEventListener('click', () => setSort(SORT_HEADERS[label]));
+  });
+  updateSortHeaders();
+}
+
+function formatModified(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(iso).setHours(0, 0, 0, 0)) / 86400000);
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (days === 0) return `Today at ${time}`;
+  if (days === 1) return `Yesterday at ${time}`;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 let SHOW_HIDDEN = false;
@@ -1137,17 +1181,14 @@ document.addEventListener('DOMContentLoaded', async function () {
       <div class="city-filter">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
         <select id="sort-select" onchange="onSortChange(this.value)">
-          <option value="name-asc">Name A–Z</option>
-          <option value="name-desc">Name Z–A</option>
-          <option value="city-asc">City A–Z</option>
-          <option value="city-desc">City Z–A</option>
-          <option value="category-asc">Category A–Z</option>
-          <option value="category-desc">Category Z–A</option>
-          <option value="updated-desc">Updated ↓</option>
-          <option value="updated-asc">Updated ↑</option>
+          <option value="updated">Date Modified</option>
+          <option value="name">Name</option>
+          <option value="city">City</option>
+          <option value="category">Category</option>
         </select>
       </div>`;
     sectionHeader.appendChild(controls);
+    initSortHeaders();
 
     gid('search-input')?.setAttribute('placeholder', 'Search locations');
     gid('search-input').addEventListener('input', filterTable);
