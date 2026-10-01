@@ -259,6 +259,7 @@ async function loadAndRenderTable() {
     EVENT_COUNT = eventCount;
 
     renderTable(LOCATIONS);
+    updateHiddenToggle();
     renderStats();
   } catch (e) {
     tbody.innerHTML = `<div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg><div class="empty-title">Failed to load</div><div class="empty-sub">${esc(e.message)}</div></div>`;
@@ -311,6 +312,7 @@ function applyLocalChange({ row, removedId }) {
 
   renderTable(LOCATIONS);
   renderStats();
+  updateHiddenToggle();
 }
 
 /* ========================================
@@ -376,11 +378,27 @@ function onSortChange(v) {
   filterTable();
 }
 
+let SHOW_HIDDEN = false;
+
+function updateHiddenToggle() {
+  const btn = gid('hidden-toggle');
+  if (!btn) return;
+  const n = LOCATIONS.filter(l => l.hidden_at).length;
+  btn.textContent = SHOW_HIDDEN ? '← Back to visible locations' : `Hidden (${n})`;
+}
+
+function toggleHiddenView() {
+  SHOW_HIDDEN = !SHOW_HIDDEN;
+  updateHiddenToggle();
+  renderTable(LOCATIONS);
+}
+
 function applySortFilter(locs) {
   const s = (gid('search-input')?.value || '').toLowerCase();
   const cf = gid('city-select')?.value || '';
 
   const filtered = locs.filter(l => {
+    if (!!l.hidden_at !== SHOW_HIDDEN) return false;
     const matchesCity = !cf || l.city_id === cf;
     const cityName = getCityName(l.city_id).toLowerCase();
 
@@ -1134,6 +1152,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     gid('search-input')?.setAttribute('placeholder', 'Search locations');
     gid('search-input').addEventListener('input', filterTable);
     gid('city-select').addEventListener('change', filterTable);
+
+    const hiddenBtn = document.createElement('button');
+    hiddenBtn.type = 'button';
+    hiddenBtn.id = 'hidden-toggle';
+    hiddenBtn.className = 'btn btn-secondary';
+    hiddenBtn.addEventListener('click', toggleHiddenView);
+    controls.appendChild(hiddenBtn);
+    updateHiddenToggle();
   }
 
   /* Sign out button in top bar */
