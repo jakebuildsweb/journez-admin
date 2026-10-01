@@ -251,7 +251,7 @@ async function loadAndRenderTable() {
 
   try {
     const [locations, eventCount] = await Promise.all([
-      sbFetch('locations?select=id,name,address,latitude,longitude,city_id,category_id,profile_image,audio_file_link,is_focal_point,operating_hours,slug,updated_at&order=name'),
+      sbFetch('locations?select=id,name,address,latitude,longitude,city_id,category_id,profile_image,audio_file_link,is_focal_point,operating_hours,slug,updated_at,hidden_at&order=name'),
       countRows('events')
     ]);
 
@@ -358,7 +358,12 @@ function renderTable(locations) {
       ? `<span style="width:7px;height:7px;border-radius:50%;background:#2563eb;display:inline-block;flex-shrink:0;margin-top:1px"></span>`
       : '';
 
-    return `<div class="table-row" onclick="openEditModal('${l.id}')"><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${esc(l.name)}</div>${focalDot}${audioIcon}</div><div class="loc-addr">${esc(l.address || '—')}</div></div><div><span class="city-tag">${esc(cityName)}</span></div><div>${catTag}</div><div>${hoursHtml}</div><div class="row-actions"><button class="icon-btn" onclick="event.stopPropagation();openEditModal('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteLocation('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
+    const hiddenTag = l.hidden_at
+      ? `<span style="font-size:11px;padding:1px 6px;border-radius:4px;background:#f3f4f6;color:#6b7280">Hidden</span>`
+      : '';
+    const hideBtn = `<button class="icon-btn" title="${l.hidden_at ? 'Show in app' : 'Hide from app'}" onclick="event.stopPropagation();toggleHidden('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor">${l.hidden_at ? '<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.5 12C3.8 7.9 7.6 5 12 5s8.2 2.9 9.5 7c-1.3 4.1-5.1 7-9.5 7s-8.2-2.9-9.5-7z"/>' : '<path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.1A9.8 9.8 0 0112 5c4.4 0 8.2 2.9 9.5 7a10 10 0 01-2.2 3.6M6.6 6.6A10 10 0 002.5 12c1.3 4.1 5.1 7 9.5 7 1.6 0 3.2-.4 4.6-1.1"/>'}</svg></button>`;
+
+    return `<div class="table-row" onclick="openEditModal('${l.id}')"${l.hidden_at ? ' style="opacity:.5"' : ''}><div><div style="display:flex;align-items:center;gap:6px"><div class="loc-name">${esc(l.name)}</div>${focalDot}${audioIcon}${hiddenTag}</div><div class="loc-addr">${esc(l.address || '—')}</div></div><div><span class="city-tag">${esc(cityName)}</span></div><div>${catTag}</div><div>${hoursHtml}</div><div class="row-actions">${hideBtn}<button class="icon-btn" onclick="event.stopPropagation();openEditModal('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11.8 15H9v-2.8l8.6-8.6z"/></svg></button><button class="icon-btn danger" onclick="event.stopPropagation();deleteLocation('${l.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div>`;
   }).join('');
 }
 
@@ -417,8 +422,25 @@ const filterTable = debounce(() => renderTable(LOCATIONS), 150);
    Delete location
 ======================================== */
 
+async function toggleHidden(id) {
+  const loc = LOCATIONS.find(l => l.id === id);
+  if (!loc) return;
+  const hidden_at = loc.hidden_at ? null : new Date().toISOString();
+
+  try {
+    const saved = await sbFetch(`locations?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ hidden_at })
+    });
+    showToast(hidden_at ? 'Hidden from the app. Click the eye to show it again.' : 'Showing in the app again.');
+    applyLocalChange({ row: Array.isArray(saved) ? saved[0] : saved });
+  } catch (e) {
+    showToast('Update failed: ' + e.message, 'error');
+  }
+}
+
 async function deleteLocation(id) {
-  if (!confirm('Delete this location? ')) return;
+  if (!confirm('Permanently delete this location? This cannot be undone. To take it out of the app but keep it, use Hide instead.')) return;
 
   try {
     await sbFetch(`locations?id=eq.${id}`, {
@@ -1219,6 +1241,7 @@ window.setPattern = setPattern;
 window.onSortChange = onSortChange;
 window.openEditModal = openEditModal;
 window.deleteLocation = deleteLocation;
+window.toggleHidden = toggleHidden;
 window.removeGalleryItem = removeGalleryItem;
 window.toggleDay = toggleDay;
 window.set24 = set24;
